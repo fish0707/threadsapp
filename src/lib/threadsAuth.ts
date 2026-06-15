@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { config, SELF_USER_ID } from "./config";
 import { encryptToken, decryptToken } from "./crypto";
 import { getStore } from "./store";
@@ -137,6 +138,27 @@ export async function resolveThreadsToken(): Promise<{ token: string; userId: st
     return { token: config.threads.accessToken, userId: config.threads.userId };
   }
   return null;
+}
+
+/**
+ * 解析並驗證 Meta 的 signed_request（deauth / data deletion 回呼用）。
+ * 格式：<base64url 簽章>.<base64url payload(JSON)>，簽章為 HMAC-SHA256(payload, appSecret)。
+ */
+export function parseSignedRequest(signed: string): { user_id?: string } | null {
+  const [sig, payload] = signed.split(".");
+  if (!sig || !payload) return null;
+  const expected = createHmac("sha256", config.threads.appSecret)
+    .update(payload)
+    .digest();
+  const got = Buffer.from(sig.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  if (expected.length !== got.length || !timingSafeEqual(expected, got)) {
+    return null;
+  }
+  try {
+    return JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /** 給 status 用的連線狀態（不發網路請求） */
