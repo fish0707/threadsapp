@@ -15,6 +15,7 @@ export default function HomePage() {
   const [posts, setPosts] = useState<ThreadsPost[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
   const [searchMeta, setSearchMeta] = useState<{ cached: boolean; mocked: boolean } | null>(null);
 
   // ── 生成設定 ──
@@ -28,15 +29,16 @@ export default function HomePage() {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<string | null>(null);
 
-  async function handleSearch() {
+  async function handleSearch(force = false) {
     if (!topic.trim()) return;
     setSearching(true);
     setError(null);
     setSelected(new Set());
     setDrafts([]);
     try {
-      const res = await api.search(topic.trim(), searchMode);
+      const res = await api.search(topic.trim(), searchMode, force);
       setPosts(res.posts);
+      setSearched(true);
       setSearchMeta({ cached: res.cached, mocked: res.mocked });
     } catch (e) {
       setError(e instanceof Error ? e.message : "搜尋失敗");
@@ -105,14 +107,26 @@ export default function HomePage() {
             <option value="KEYWORD">關鍵字</option>
             <option value="TAG">主題標籤</option>
           </select>
-          <button className="btn-primary sm:w-32" onClick={handleSearch} disabled={searching}>
+          <button
+            className="btn-primary sm:w-32"
+            onClick={() => handleSearch()}
+            disabled={searching}
+          >
             {searching ? "搜尋中…" : "搜尋熱門"}
           </button>
         </div>
         {searchMeta && (
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
             {searchMeta.cached ? "📦 來自今日快取（省 API 額度）" : "🔄 即時查詢"}
             {searchMeta.mocked && " · 範例資料"}
+            {searchMeta.cached && (
+              <button
+                className="text-brand-accent hover:underline"
+                onClick={() => handleSearch(true)}
+              >
+                略過快取重查
+              </button>
+            )}
           </p>
         )}
       </section>
@@ -141,8 +155,22 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 步驟三：生成設定 */}
-      {posts.length > 0 && (
+      {/* 搜尋了但 0 筆：說明限制，仍可往下生成 */}
+      {searched && posts.length === 0 && (
+        <section className="card p-5">
+          <h2 className="mb-2 text-lg font-bold">② 沒有搜尋到貼文</h2>
+          <p className="text-sm text-gray-600">
+            這通常是正常的：<b>keyword_search 在通過 Meta 審核前，只會搜到你自己帳號的貼文</b>。
+            等 <code>threads_keyword_search</code> 權限審核通過後，就能搜到公開熱門文。
+          </p>
+          <p className="mt-2 text-sm text-gray-500">
+            不影響使用 — 你仍可直接在下方選風格，讓 AI 依主題生成草稿。
+          </p>
+        </section>
+      )}
+
+      {/* 步驟三：生成設定（有搜尋過就顯示，參考文為選用） */}
+      {searched && (
         <section className="card p-5">
           <h2 className="mb-3 text-lg font-bold">③ 選風格，AI 生成草稿</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
