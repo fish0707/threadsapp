@@ -74,9 +74,9 @@ async function refreshLongLived(
   return { accessToken: json.access_token, expiresIn: json.expires_in };
 }
 
-async function fetchUsername(token: string, userId: string): Promise<string | null> {
+async function fetchUsername(token: string, _userId: string): Promise<string | null> {
   try {
-    const url = new URL(`${GRAPH_BASE}/${config.threads.apiVersion}/${userId}`);
+    const url = new URL(`${GRAPH_BASE}/${config.threads.apiVersion}/me`);
     url.searchParams.set("fields", "username");
     url.searchParams.set("access_token", token);
     const res = await fetch(url.toString());

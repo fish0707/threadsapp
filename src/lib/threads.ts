@@ -58,11 +58,13 @@ export async function publishTextPost(
     };
   }
 
-  const { token, userId } = auth;
+  const { token } = auth;
   const { apiVersion } = config.threads;
+  // 用 me 作為節點（token 已綁定使用者），避免 user id 不一致導致的 33 錯誤
+  const node = "me";
 
   // Step 1: create container
-  const createUrl = new URL(`${GRAPH_BASE}/${apiVersion}/${userId}/threads`);
+  const createUrl = new URL(`${GRAPH_BASE}/${apiVersion}/${node}/threads`);
   createUrl.searchParams.set("media_type", "TEXT");
   createUrl.searchParams.set("text", text);
   createUrl.searchParams.set("access_token", token);
@@ -74,7 +76,7 @@ export async function publishTextPost(
   const { id: creationId } = (await createRes.json()) as { id: string };
 
   // Step 2: publish
-  const publishUrl = new URL(`${GRAPH_BASE}/${apiVersion}/${userId}/threads_publish`);
+  const publishUrl = new URL(`${GRAPH_BASE}/${apiVersion}/${node}/threads_publish`);
   publishUrl.searchParams.set("creation_id", creationId);
   publishUrl.searchParams.set("access_token", token);
 
