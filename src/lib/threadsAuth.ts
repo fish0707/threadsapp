@@ -42,7 +42,7 @@ async function exchangeCode(
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  if (!res.ok) throw new Error(`換取 token 失敗 (${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`[換短效token] (${res.status}) ${await res.text()}`);
   const json = (await res.json()) as { access_token: string; user_id: string };
   return { accessToken: json.access_token, userId: String(json.user_id) };
 }
@@ -56,7 +56,7 @@ async function exchangeLongLived(
   url.searchParams.set("client_secret", config.threads.appSecret);
   url.searchParams.set("access_token", shortToken);
   const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`換取長效 token 失敗 (${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`[換長效token] (${res.status}) ${await res.text()}`);
   const json = (await res.json()) as { access_token: string; expires_in: number };
   return { accessToken: json.access_token, expiresIn: json.expires_in };
 }
@@ -92,9 +92,21 @@ export async function completeOAuth(code: string, redirectUri: string): Promise<
   const short = await exchangeCode(code, redirectUri);
   const long = await exchangeLongLived(short.accessToken);
   const username = await fetchUsername(long.accessToken, short.userId);
+  try {
+    await saveResolved(short.userId, long, username);
+  } catch (e) {
+    throw new Error(`[存入DB] ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function saveResolved(
+  userId: string,
+  long: { accessToken: string; expiresIn: number },
+  username: string | null,
+): Promise<void> {
   await getStore().saveAuthUser(SELF_USER_ID, {
     access_token: encryptToken(long.accessToken),
-    threads_user_id: short.userId,
+    threads_user_id: userId,
     username,
     token_expires_at: new Date(Date.now() + long.expiresIn * 1000).toISOString(),
   });
