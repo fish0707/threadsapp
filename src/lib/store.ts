@@ -2,6 +2,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config } from "./config";
 import type { Draft, DraftStyle, DraftStatus, PublishedPost, ThreadsPost } from "./types";
 
+/** 已授權使用者的 Threads token 紀錄（access_token 為密文/明文） */
+export interface AuthUser {
+  access_token: string;
+  threads_user_id: string;
+  username: string | null;
+  token_expires_at: string | null; // ISO
+}
+
 /**
  * 資料存取層。有 Supabase 金鑰 → 走 Supabase；否則用記憶體暫存（demo 用，重啟即清空）。
  * 透過介面隔離，Phase 2 可無痛換成真實 DB / 加 RLS。
@@ -28,6 +36,9 @@ export interface Store {
     threadsPostId: string;
     permalink?: string;
   }): Promise<PublishedPost>;
+  getAuthUser(userId: string): Promise<AuthUser | null>;
+  saveAuthUser(userId: string, data: AuthUser): Promise<void>;
+  clearAuthUser(userId: string): Promise<void>;
 }
 
 function todayStr(): string {
@@ -44,13 +55,19 @@ interface MemoryDb {
   topicCache: Map<string, { posts: ThreadsPost[]; cached_at: string; date: string }>;
   drafts: Draft[];
   published: PublishedPost[];
+  authUsers: Map<string, AuthUser>;
 }
 
 // 用 globalThis 讓 dev 熱重載時不被清空
 const g = globalThis as unknown as { __maimaiDb?: MemoryDb };
 const memory: MemoryDb =
   g.__maimaiDb ??
-  (g.__maimaiDb = { topicCache: new Map(), drafts: [], published: [] });
+  (g.__maimaiDb = {
+    topicCache: new Map(),
+    drafts: [],
+    published: [],
+    authUsers: new Map(),
+  });
 
 class MemoryStore implements Store {
   async getTopicCache(topic: string): Promise<ThreadsPost[] | null> {
@@ -127,6 +144,15 @@ class MemoryStore implements Store {
     };
     memory.published.push(rec);
     return rec;
+  }
+  async getAuthUser(userId: string): Promise<AuthUser | null> {
+    return memory.authUsers.get(userId) ?? null;
+  }
+  async saveAuthUser(userId: string, data: AuthUser): Promise<void> {
+    memory.authUsers.set(userId, data);
+  }
+  async clearAuthUser(userId: string): Promise<void> {
+    memory.authUsers.delete(userId);
   }
 }
 
@@ -230,6 +256,34 @@ class SupabaseStore implements Store {
       .single();
     if (error) throw new Error(error.message);
     return data as PublishedPost;
+  }
+  async getAuthUser(userId: string): Promise<AuthUser | null> {
+    const { data } = await this.db
+      .from("users")
+      .select("access_token, threads_user_id, username, token_expires_at")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!data || !data.access_token) return null;
+    return data as AuthUser;
+  }
+  async saveAuthUser(userId: string, data: AuthUser): Promise<void> {
+    const { error } = await this.db.from("users").upsert(
+      {
+        id: userId,
+        access_token: data.access_token,
+        threads_user_id: data.threads_user_id,
+        username: data.username,
+        token_expires_at: data.token_expires_at,
+      },
+      { onConflict: "id" },
+    );
+    if (error) throw new Error(error.message);
+  }
+  async clearAuthUser(userId: string): Promise<void> {
+    await this.db
+      .from("users")
+      .update({ access_token: null, token_expires_at: null })
+      .eq("id", userId);
   }
 }
 

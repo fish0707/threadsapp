@@ -33,8 +33,22 @@ npm run dev                  # http://localhost:3000
 - **Claude 高品質模式**：`ANTHROPIC_API_KEY`
 - **資料持久化**：`NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
   - 先到 Supabase SQL Editor 執行 [`supabase/schema.sql`](supabase/schema.sql) 建表。
-- **Threads 搜尋 + 發佈**：`THREADS_ACCESS_TOKEN`（+ `THREADS_USER_ID`）
+- **Threads 搜尋 + 發佈（推薦走 OAuth）**：`THREADS_APP_ID` + `THREADS_APP_SECRET`
+  - 設好後首頁會出現「連結 Threads 帳號」按鈕，點一下完成授權即可，系統自動換**長效 token（~60 天）並在到期前自動續期**，存進 Supabase（設 `TOKEN_ENCRYPTION_KEY` 會加密儲存）。
+  - 到 Meta → Threads 使用案例 → 設定，把這個加進 **Redirect Callback URLs**：
+    `https://你的網域/api/auth/threads/callback`
+  - 後備：也可不走 OAuth，直接手動貼 `THREADS_ACCESS_TOKEN`（+ `THREADS_USER_ID`）。
   - 需先完成 Meta 開發者帳號、Threads App、`keyword_search` 與 publishing 權限審核（見下方 Phase 0）。
+
+### Threads OAuth 流程（自動換 / 續 token）
+
+```
+首頁「連結 Threads 帳號」→ /api/auth/threads/login
+   → Threads 授權頁（threads_basic / content_publish / keyword_search）
+   → /api/auth/threads/callback?code=...
+   → 換短效 token → 換長效 token(~60天) → (加密) 存 Supabase users 表
+搜尋 / 發佈時：resolveThreadsToken() 讀 DB token，剩 <7 天自動續期
+```
 
 完整變數說明見 [`.env.example`](.env.example)。
 

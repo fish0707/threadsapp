@@ -9,13 +9,19 @@ create extension if not exists "pgcrypto";
 -- ── 使用者與授權 ────────────────────────────────────────────────
 -- Phase 1 自用時可只放一筆 id='self'。Phase 2 改成 OAuth 多使用者。
 create table if not exists users (
-  id              text primary key,
-  threads_user_id text,
-  -- access_token 屬敏感資料：請用 Supabase Vault 或應用層加密後再存，
-  -- 絕不可放進前端或 URL。此欄位僅存密文。
-  access_token    text,
-  created_at      timestamptz not null default now()
+  id               text primary key,
+  threads_user_id  text,
+  username         text,
+  -- access_token 屬敏感資料：app 層用 AES-256-GCM 加密後再存（設 TOKEN_ENCRYPTION_KEY），
+  -- 絕不可放進前端或 URL。此欄位存密文。
+  access_token     text,
+  token_expires_at timestamptz,
+  created_at       timestamptz not null default now()
 );
+
+-- 若 users 表已存在舊版，補上新欄位：
+alter table users add column if not exists username text;
+alter table users add column if not exists token_expires_at timestamptz;
 
 -- ── 熱門文快取（依 主題 + 日期）────────────────────────────────
 create table if not exists topic_cache (

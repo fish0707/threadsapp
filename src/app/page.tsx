@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import MockBanner from "@/components/MockBanner";
+import ThreadsConnect from "@/components/ThreadsConnect";
 import PostCard from "@/components/PostCard";
 import PublishModal from "@/components/PublishModal";
 import { api } from "@/lib/client";
@@ -83,6 +84,7 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       <MockBanner />
+      <ThreadsConnect />
 
       {/* 步驟一：輸入主題 */}
       <section className="card p-5">
