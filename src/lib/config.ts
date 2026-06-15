@@ -16,8 +16,9 @@ export const config = {
     },
   },
   supabase: {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    // 去掉結尾斜線/空白，避免 supabase-js 組出雙斜線路徑
+    url: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/+$/, ""),
+    serviceKey: (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim(),
     get enabled() {
       return this.url.length > 0 && this.serviceKey.length > 0;
     },
