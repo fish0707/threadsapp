@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import MockBanner from "@/components/MockBanner";
-import ThreadsConnect from "@/components/ThreadsConnect";
 import PostCard from "@/components/PostCard";
 import PublishModal from "@/components/PublishModal";
 import { api } from "@/lib/client";
 import { DRAFT_STYLES, type AiMode, type DraftStyle, type ThreadsPost } from "@/lib/types";
+
+const QUICK_TOPICS = ["理財", "健身", "AI 工具", "職場", "親子", "美食"];
 
 export default function HomePage() {
   // ── 搜尋 ──
@@ -23,20 +24,21 @@ export default function HomePage() {
   const [mode, setMode] = useState<AiMode>("gemini");
   const [count, setCount] = useState(3);
   const [generating, setGenerating] = useState(false);
-  const [drafts, setDrafts] = useState<string[]>([]);
+  const [drafts, setDrafts] = useState<{ content: string; style: DraftStyle }[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<string | null>(null);
 
-  async function handleSearch(force = false) {
-    if (!topic.trim()) return;
+  async function handleSearch(t?: string, force = false) {
+    const q = (t ?? topic).trim();
+    if (!q) return;
+    if (t) setTopic(t);
     setSearching(true);
     setError(null);
     setSelected(new Set());
-    setDrafts([]);
     try {
-      const res = await api.search(topic.trim(), searchMode, force);
+      const res = await api.search(q, searchMode, force);
       setPosts(res.posts);
       setSearched(true);
       setSearchMeta({ cached: res.cached, mocked: res.mocked });
@@ -61,7 +63,7 @@ export default function HomePage() {
     try {
       const references = posts.filter((p) => selected.has(p.id));
       const res = await api.generate({ topic: topic.trim(), references, style, mode, count });
-      setDrafts(res.drafts);
+      setDrafts(res.drafts.map((content) => ({ content, style })));
     } catch (e) {
       setError(e instanceof Error ? e.message : "生成失敗");
     } finally {
@@ -69,9 +71,9 @@ export default function HomePage() {
     }
   }
 
-  async function saveDraft(content: string) {
+  async function saveDraft(content: string, s: DraftStyle) {
     try {
-      await api.saveDraft({ topic: topic.trim(), content, style });
+      await api.saveDraft({ topic: topic.trim(), content, style: s });
       flash("已存入草稿匣");
     } catch (e) {
       setError(e instanceof Error ? e.message : "儲存失敗");
@@ -83,164 +85,221 @@ export default function HomePage() {
     setTimeout(() => setSavedMsg(null), 2000);
   }
 
-  return (
-    <div className="space-y-6">
-      <MockBanner />
-      <ThreadsConnect />
-
-      {/* 步驟一：輸入主題 */}
-      <section className="card p-5">
-        <h2 className="mb-3 text-lg font-bold">① 輸入主題，抓當天熱門文</h2>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            className="input"
-            placeholder="例：職場、理財、健身、AI 工具"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          />
-          <select
-            className="input sm:w-32"
-            value={searchMode}
-            onChange={(e) => setSearchMode(e.target.value as "KEYWORD" | "TAG")}
-          >
-            <option value="KEYWORD">關鍵字</option>
-            <option value="TAG">主題標籤</option>
-          </select>
-          <button
-            className="btn-primary sm:w-32"
-            onClick={() => handleSearch()}
-            disabled={searching}
-          >
-            {searching ? "搜尋中…" : "搜尋熱門"}
-          </button>
-        </div>
-        {searchMeta && (
-          <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-            {searchMeta.cached ? "📦 來自今日快取（省 API 額度）" : "🔄 即時查詢"}
-            {searchMeta.mocked && " · 範例資料"}
-            {searchMeta.cached && (
-              <button
-                className="text-brand-accent hover:underline"
-                onClick={() => handleSearch(true)}
-              >
-                略過快取重查
-              </button>
-            )}
+  // ───────────────────────── Hero（尚未搜尋）─────────────────────────
+  if (!searched) {
+    return (
+      <div className="space-y-6">
+        <MockBanner />
+        <section className="mx-auto max-w-2xl pt-10 text-center">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-500">
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            今日 Threads 熱度・即時追蹤
           </p>
-        )}
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+            今天想經營什麼主題？
+          </h1>
+          <p className="mx-auto mt-4 max-w-md text-gray-500">
+            輸入主題，我幫你抓今天的熱門貼文，再換句話說生成屬於你的貼文。
+          </p>
+
+          <div className="mx-auto mt-8 flex max-w-xl flex-col gap-2 sm:flex-row">
+            <input
+              className="input"
+              placeholder="例：職場、理財、健身、AI 工具"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              autoFocus
+            />
+            <select
+              className="input sm:w-28"
+              value={searchMode}
+              onChange={(e) => setSearchMode(e.target.value as "KEYWORD" | "TAG")}
+            >
+              <option value="KEYWORD">關鍵字</option>
+              <option value="TAG">標籤</option>
+            </select>
+            <button
+              className="btn-primary sm:w-32"
+              onClick={() => handleSearch()}
+              disabled={searching}
+            >
+              {searching ? "搜尋中…" : "搜尋熱門"}
+            </button>
+          </div>
+
+          <div className="mt-8">
+            <p className="mb-3 text-xs text-gray-400">或從你的主題開始</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {QUICK_TOPICS.map((t) => (
+                <button key={t} className="chip" onClick={() => handleSearch(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div className="mx-auto mt-6 max-w-xl rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  // ───────────────────────── 搜尋後：雙欄 ─────────────────────────
+  return (
+    <div className="space-y-5">
+      <MockBanner />
+
+      {/* 緊湊搜尋列 */}
+      <section className="card flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
+        <input
+          className="input"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+        />
+        <select
+          className="input sm:w-28"
+          value={searchMode}
+          onChange={(e) => setSearchMode(e.target.value as "KEYWORD" | "TAG")}
+        >
+          <option value="KEYWORD">關鍵字</option>
+          <option value="TAG">標籤</option>
+        </select>
+        <button
+          className="btn-primary sm:w-28"
+          onClick={() => handleSearch()}
+          disabled={searching}
+        >
+          {searching ? "搜尋中…" : "搜尋"}
+        </button>
       </section>
 
       {error && (
         <div className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
       )}
 
-      {/* 步驟二：勾選參考文 */}
-      {posts.length > 0 && (
-        <section className="card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-bold">② 勾選參考素材</h2>
-            <span className="text-sm text-gray-500">已選 {selected.size} 篇</span>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* 左：靈感動態（熱門文） */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">靈感動態</h2>
+            <span className="text-xs text-gray-400">
+              已選 {selected.size} 篇 · 點卡片加入參考
+            </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {posts.map((p) => (
-              <PostCard
-                key={p.id}
-                post={p}
-                selected={selected.has(p.id)}
-                onToggle={() => toggle(p.id)}
-              />
-            ))}
-          </div>
+
+          {searchMeta && (
+            <p className="flex items-center gap-2 text-xs text-gray-400">
+              {searchMeta.cached ? "📦 來自今日快取（省 API 額度）" : "🔄 即時查詢"}
+              {searchMeta.mocked && " · 範例資料"}
+              {searchMeta.cached && (
+                <button
+                  className="text-brand-accent hover:underline"
+                  onClick={() => handleSearch(undefined, true)}
+                >
+                  略過快取重查
+                </button>
+              )}
+            </p>
+          )}
+
+          {posts.length > 0 ? (
+            <div className="space-y-3">
+              {posts.map((p) => (
+                <PostCard
+                  key={p.id}
+                  post={p}
+                  selected={selected.has(p.id)}
+                  onToggle={() => toggle(p.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="card p-5 text-sm text-gray-600">
+              <p className="font-medium">沒有搜尋到貼文</p>
+              <p className="mt-1 text-gray-500">
+                keyword_search 在通過 Meta 審核前，只會搜到你自己帳號的貼文。
+                審核通過後即可搜到公開熱門文。不影響右側直接生成草稿。
+              </p>
+            </div>
+          )}
         </section>
-      )}
 
-      {/* 搜尋了但 0 筆：說明限制，仍可往下生成 */}
-      {searched && posts.length === 0 && (
-        <section className="card p-5">
-          <h2 className="mb-2 text-lg font-bold">② 沒有搜尋到貼文</h2>
-          <p className="text-sm text-gray-600">
-            這通常是正常的：<b>keyword_search 在通過 Meta 審核前，只會搜到你自己帳號的貼文</b>。
-            等 <code>threads_keyword_search</code> 權限審核通過後，就能搜到公開熱門文。
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            不影響使用 — 你仍可直接在下方選風格，讓 AI 依主題生成草稿。
-          </p>
-        </section>
-      )}
+        {/* 右：AI 生成 */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold">AI 生成</h2>
 
-      {/* 步驟三：生成設定（有搜尋過就顯示，參考文為選用） */}
-      {searched && (
-        <section className="card p-5">
-          <h2 className="mb-3 text-lg font-bold">③ 選風格，AI 生成草稿</h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {DRAFT_STYLES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setStyle(s.value)}
-                className={`rounded-lg border p-3 text-left transition ${
-                  style === s.value
-                    ? "border-brand-accent bg-indigo-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="text-sm font-medium">{s.label}</div>
-                <div className="mt-0.5 text-xs text-gray-500">{s.hint}</div>
-              </button>
-            ))}
-          </div>
+          <div className="card space-y-3 p-4">
+            <div className="grid grid-cols-2 gap-2">
+              {DRAFT_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStyle(s.value)}
+                  className={`rounded-xl border p-2.5 text-left transition ${
+                    style === s.value
+                      ? "border-gray-900 bg-gray-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-sm font-medium">{s.label}</div>
+                  <div className="mt-0.5 text-[11px] text-gray-500">{s.hint}</div>
+                </button>
+              ))}
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              模型
+            <div className="flex flex-wrap items-center gap-3">
               <select
-                className="input w-40"
+                className="input w-36"
                 value={mode}
                 onChange={(e) => setMode(e.target.value as AiMode)}
               >
-                <option value="gemini">Gemini（主力・快）</option>
+                <option value="gemini">Gemini（快）</option>
                 <option value="claude">Claude（高品質）</option>
               </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              生成數量
               <select
-                className="input w-20"
+                className="input w-24"
                 value={count}
                 onChange={(e) => setCount(Number(e.target.value))}
               >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
-                    {n}
+                    {n} 篇
                   </option>
                 ))}
               </select>
-            </label>
-            <button className="btn-primary" onClick={handleGenerate} disabled={generating}>
-              {generating ? "生成中…" : "✨ 生成草稿"}
-            </button>
+              <button
+                className="btn-primary flex-1"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                {generating ? "生成中…" : "✨ 生成草稿"}
+              </button>
+            </div>
           </div>
-        </section>
-      )}
 
-      {/* 步驟四：草稿結果 */}
-      {drafts.length > 0 && (
-        <section className="card p-5">
-          <h2 className="mb-3 text-lg font-bold">④ 草稿結果</h2>
-          <div className="space-y-3">
-            {drafts.map((d, i) => (
-              <DraftResult
-                key={i}
-                index={i}
-                content={d}
-                onSave={saveDraft}
-                onCopy={() => flash("已複製")}
-                onPublish={(edited) => setPublishTarget(edited)}
-              />
-            ))}
-          </div>
+          {drafts.map((d, i) => (
+            <DraftResult
+              key={i}
+              content={d.content}
+              styleValue={d.style}
+              onSave={saveDraft}
+              onCopy={() => flash("已複製")}
+              onPublish={(edited) => setPublishTarget(edited)}
+            />
+          ))}
+
+          {drafts.length === 0 && !generating && (
+            <div className="card p-8 text-center text-sm text-gray-400">
+              選好風格後按「生成草稿」，結果會顯示在這裡。
+            </div>
+          )}
         </section>
-      )}
+      </div>
 
       {savedMsg && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-gray-900 px-4 py-2 text-sm text-white shadow-lg">
@@ -256,23 +315,25 @@ export default function HomePage() {
 }
 
 function DraftResult({
-  index,
   content,
+  styleValue,
   onSave,
   onCopy,
   onPublish,
 }: {
-  index: number;
   content: string;
-  onSave: (content: string) => void;
+  styleValue: DraftStyle;
+  onSave: (content: string, style: DraftStyle) => void;
   onCopy: () => void;
   onPublish: (content: string) => void;
 }) {
   const [text, setText] = useState(content);
+  const label = DRAFT_STYLES.find((s) => s.value === styleValue)?.label ?? styleValue;
+
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
+    <div className="card p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-500">草稿 {index + 1}</span>
+        <span className="badge">{label}</span>
         <span className="text-xs text-gray-400">{[...text].length} 字</span>
       </div>
       <textarea
@@ -280,7 +341,13 @@ function DraftResult({
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="btn-primary" onClick={() => onPublish(text)}>
+          發佈到 Threads
+        </button>
+        <button className="btn-ghost" onClick={() => onSave(text, styleValue)}>
+          存草稿
+        </button>
         <button
           className="btn-ghost"
           onClick={() => {
@@ -289,12 +356,6 @@ function DraftResult({
           }}
         >
           複製
-        </button>
-        <button className="btn-ghost" onClick={() => onSave(text)}>
-          存入草稿匣
-        </button>
-        <button className="btn-primary" onClick={() => onPublish(text)}>
-          發佈
         </button>
       </div>
     </div>

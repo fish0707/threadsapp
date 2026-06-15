@@ -20,35 +20,44 @@ export default function PostCard({
   onToggle: () => void;
 }) {
   return (
-    <label
-      className={`card block cursor-pointer p-4 transition ${
-        selected ? "ring-2 ring-brand-accent" : "hover:border-gray-300"
+    <button
+      onClick={onToggle}
+      className={`card w-full p-4 text-left transition ${
+        selected ? "ring-2 ring-gray-900" : "hover:border-gray-300"
       }`}
     >
-      <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggle}
-          className="mt-1 h-4 w-4 accent-brand-accent"
-        />
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+          {post.username.slice(0, 2).toUpperCase()}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-gray-900">@{post.username}</span>
-            <span className="text-xs text-gray-400">{timeAgo(post.timestamp)}</span>
-          </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{post.text}</p>
-          <a
-            href={post.permalink}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="mt-2 inline-block text-xs text-brand-accent hover:underline"
-          >
-            在 Threads 上查看 ↗
-          </a>
+          <div className="truncate text-sm font-semibold">@{post.username}</div>
+          <div className="text-xs text-gray-400">{timeAgo(post.timestamp)} · 🔥 TOP</div>
         </div>
+        <span
+          className={`flex h-5 w-5 items-center justify-center rounded-full border text-xs ${
+            selected
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-gray-300 text-transparent"
+          }`}
+        >
+          ✓
+        </span>
       </div>
-    </label>
+
+      <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-sm text-gray-700">
+        {post.text}
+      </p>
+
+      <a
+        href={post.permalink}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="mt-2 inline-block text-xs text-gray-400 hover:text-gray-900 hover:underline"
+      >
+        在 Threads 上查看 ↗
+      </a>
+    </button>
   );
 }

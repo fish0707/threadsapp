@@ -11,14 +11,19 @@ body {
 }
 
 .card {
-  @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+  @apply rounded-2xl border border-gray-200 bg-white shadow-sm;
 }
 
 .btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
 }
 
+/* 主要按鈕：黑底（呼應 Threads 風格） */
 .btn-primary {
+  @apply btn bg-gray-900 text-white hover:bg-black;
+}
+
+.btn-accent {
   @apply btn bg-brand-accent text-white hover:bg-brand-accentHover;
 }
 
@@ -27,5 +32,23 @@ body {
 }
 
 .input {
-  @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/20;
+  @apply w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10;
+}
+
+/* 主題快選膠囊 */
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-sm text-gray-700 transition hover:border-gray-900 hover:bg-gray-900 hover:text-white;
+}
+
+/* 風格標籤 */
+.badge {
+  @apply inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-brand-accent;
+}
+
+/* 導覽分頁 */
+.navtab {
+  @apply rounded-full px-3.5 py-1.5 text-sm text-gray-500 transition hover:text-gray-900;
+}
+.navtab-active {
+  @apply bg-gray-900 text-white hover:text-white;
 }

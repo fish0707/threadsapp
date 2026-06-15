@@ -39,6 +39,7 @@ export interface Store {
   getAuthUser(userId: string): Promise<AuthUser | null>;
   saveAuthUser(userId: string, data: AuthUser): Promise<void>;
   clearAuthUser(userId: string): Promise<void>;
+  listPublished(userId: string): Promise<PublishedPost[]>;
 }
 
 function todayStr(): string {
@@ -153,6 +154,11 @@ class MemoryStore implements Store {
   }
   async clearAuthUser(userId: string): Promise<void> {
     memory.authUsers.delete(userId);
+  }
+  async listPublished(userId: string): Promise<PublishedPost[]> {
+    return memory.published
+      .filter((p) => p.user_id === userId)
+      .sort((a, b) => b.published_at.localeCompare(a.published_at));
   }
 }
 
@@ -284,6 +290,14 @@ class SupabaseStore implements Store {
       .from("users")
       .update({ access_token: null, token_expires_at: null })
       .eq("id", userId);
+  }
+  async listPublished(userId: string): Promise<PublishedPost[]> {
+    const { data } = await this.db
+      .from("published_posts")
+      .select("*")
+      .eq("user_id", userId)
+      .order("published_at", { ascending: false });
+    return (data ?? []) as PublishedPost[];
   }
 }
 
