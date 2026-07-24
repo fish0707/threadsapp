@@ -48,7 +48,8 @@ class Watch:
                  momo / PChome / Funbox 上請用「相同」的 product_key,行事曆
                  才能把它們併成一個事件。
     platform:    "momo" | "pchome" | "funbox"
-    item_id:     平台商品識別碼(momo 為 goodsCode;PChome 為 prod id)。
+    item_id:     平台商品識別碼。momo 為 goodsCode;PChome 為 prod id
+                 (如 "DGAJ8T-A900AVFV7");funbox 直接填「商品頁完整網址」。
     keyword:     搜尋用關鍵字(給搜尋型 monitor 抓新品用,單品監控可留空)。
     original_price: 已知「原價 / 建議售價」(NT$)。用來判斷觀測到的售價是否為原價。
                     不填則 is_original_price 會是 None(未知)。
@@ -73,6 +74,23 @@ WATCHES: list[Watch] = [
         original_price=390,
         name="Beyblade X UX-04(範例)",
     ),
+    # 跨平台同款:用「相同 product_key」串起來,行事曆會自動合併。
+    # 打開下面兩筆(填真實 id / 網址)即可讓 PChome、Funbox 一起盯 UX-04。
+    #
+    # Watch(
+    #     product_key="UX-04",
+    #     platform="pchome",
+    #     item_id="DGAJ8T-XXXXXXXX",   # PChome prod id
+    #     original_price=390,
+    #     name="Beyblade X UX-04",
+    # ),
+    # Watch(
+    #     product_key="UX-04",
+    #     platform="funbox",
+    #     item_id="https://funbox 商品頁完整網址",  # funbox 用網址當 item_id
+    #     original_price=390,
+    #     name="Beyblade X UX-04",
+    # ),
 ]
 
 

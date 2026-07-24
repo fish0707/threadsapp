@@ -41,8 +41,8 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 | `draft.py` | ✅ | 貼文草稿(自寫摘要)+ 蝦皮分潤/導流連結 |
 | `feed_manual.py` | ✅ | 人工餵料(超商/粉專公告),走同一 upsert/狀態機/通知 |
 | `run.py` | ✅ | 排程主迴圈 |
-| `monitors/pchome.py` | 🏗 骨架 | 階段二:PChome 公開 JSON(結構已對齊 momo,補 fetch 即可) |
-| `monitors/funbox.py` | 🏗 骨架 | 階段二:Funbox SHOPLINE(原價第一手,優先做穩) |
+| `monitors/pchome.py` | ✅ 階段二 | PChome 公開 JSON(Price P/M、Qty);市價 M 可當原價後備 |
+| `monitors/funbox.py` | ✅ 階段二 | Funbox SHOPLINE:解析商品頁 JSON-LD(Offer 的 price/availability) |
 
 ## 快速開始
 
@@ -89,9 +89,13 @@ python feed_manual.py --key UX-05 --platform seven --name "UX-05 超商限量" \
 
 ## 分階段
 
-- **MVP(本次已完成)**:momo monitor + calendar_db + notify + draft + feed_manual + run,含 21 項測試。
-- **階段二**:補齊 `monitors/pchome.py`、`monitors/funbox.py` 的 `fetch`。
+- **MVP(已完成)**:momo monitor + calendar_db + notify + draft + feed_manual + run。
+- **階段二(已完成)**:`monitors/pchome.py`(公開 JSON)、`monitors/funbox.py`(JSON-LD)。
+  三平台同款用相同 `product_key` 自動合併,`by_product_key()` 可查各平台現況。
 - **階段三**:蝦皮分潤過審後,把 `draft.py` 的 `shopee_link` 換成分潤後台產生的正式連結。
+
+共 33 項單元測試(momo / pchome / funbox 解析 + 行事曆狀態機 + 通知 + 草稿),
+全部不需金鑰、不打真實網路。
 
 ## 測試
 
