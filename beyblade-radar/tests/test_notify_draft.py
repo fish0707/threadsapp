@@ -36,8 +36,15 @@ class NotifyFormatTest(unittest.TestCase):
         msg = format_change(c)
         self.assertIn("即將開賣", msg)
 
-    def test_new_event_headline(self):
-        c = Change(event=event(status="ON_SALE"), old_status=None, old_price=None)
+    def test_new_available_headline(self):
+        # 新商品且可購買 → 新商品上架(對齊截圖那種通知)
+        c = Change(event=event(status="ON_SALE", available=True), old_status=None, old_price=None)
+        msg = format_change(c)
+        self.assertIn("新商品上架", msg)
+
+    def test_new_unavailable_headline(self):
+        # 新事件但尚未可購買(如預告)→ 新情報
+        c = Change(event=event(status="ANNOUNCED", available=False, price=None), old_status=None, old_price=None)
         msg = format_change(c)
         self.assertIn("新情報", msg)
 

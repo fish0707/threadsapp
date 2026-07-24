@@ -173,6 +173,13 @@ class Calendar:
         )
         return [_row_to_event(r) for r in cur.fetchall()]
 
+    def count_platform(self, platform: str) -> int:
+        """某平台目前已存幾筆(用來判斷發現式監控是否為首次掃描)。"""
+        cur = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM events WHERE platform=?", (platform,)
+        )
+        return int(cur.fetchone()["n"])
+
     def all_events(self) -> list[EventRow]:
         cur = self._conn.execute(
             "SELECT * FROM events ORDER BY COALESCE(on_sale_ts, last_updated_at)"

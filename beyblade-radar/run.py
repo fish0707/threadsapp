@@ -15,35 +15,58 @@ import argparse
 import time
 
 from calendar_db import Calendar
-from config import SETTINGS, WATCHES
+from config import SETTINGS, SEARCHES, WATCHES
+from monitors.eslite import EsliteMonitor
 from monitors.funbox import FunboxMonitor
 from monitors.momo import MomoMonitor
 from monitors.pchome import PChomeMonitor
 from monitors.base import ProductSnapshot
 from notify import Notifier
 
-MONITORS = [MomoMonitor(), PChomeMonitor(), FunboxMonitor()]
+# 盯「已知商品碼」的 monitor
+ITEM_MONITORS = [MomoMonitor(), PChomeMonitor(), FunboxMonitor()]
+# 掃「搜尋頁抓新品」的發現式 monitor(一站一個 adapter)
+DISCOVERY_MONITORS = [EsliteMonitor()]
 
 
 def run_once(cal: Calendar, notifier: Notifier, now: int | None = None) -> int:
     """跑一輪。回傳送出的通知數。"""
-    snaps: list[ProductSnapshot] = []
-    for mon in MONITORS:
+    lead = SETTINGS.imminent_lead_min * 60
+    all_changes = []
+    n_obs = 0
+
+    # 1) 盯已知商品碼
+    item_snaps: list[ProductSnapshot] = []
+    for mon in ITEM_MONITORS:
         try:
-            snaps.extend(mon.fetch(WATCHES))
+            item_snaps.extend(mon.fetch(WATCHES))
         except Exception as exc:  # 單一 monitor 出錯不拖垮整輪
             print(f"[run] monitor {mon.platform} 失敗: {exc}")
+    n_obs += len(item_snaps)
+    all_changes.extend(cal.upsert_many(item_snaps, now=now, imminent_lead_sec=lead))
 
-    changes = cal.upsert_many(
-        snaps, now=now, imminent_lead_sec=SETTINGS.imminent_lead_min * 60
-    )
-    for c in changes:
+    # 2) 發現式掃描(首次掃描建立基準線,不通知,避免第一輪洗版)
+    for mon in DISCOVERY_MONITORS:
+        try:
+            dsnaps = mon.fetch_searches(SEARCHES)
+        except Exception as exc:
+            print(f"[run] discovery {mon.platform} 失敗: {exc}")
+            continue
+        n_obs += len(dsnaps)
+        first_run = cal.count_platform(mon.platform) == 0
+        changes = cal.upsert_many(dsnaps, now=now, imminent_lead_sec=lead)
+        if first_run:
+            print(f"[run] {mon.platform} 首次掃描,建立基準線 {len(dsnaps)} 筆(不通知)。")
+        else:
+            all_changes.extend(changes)
+
+    for c in all_changes:
         notifier.notify_change(c)
-    if changes:
-        print(f"[run] 本輪 {len(snaps)} 筆觀測,{len(changes)} 筆變更並已通知。")
+    if all_changes:
+        print(f"[run] 本輪 {n_obs} 筆觀測,{len(all_changes)} 筆變更並已通知。")
     else:
-        print(f"[run] 本輪 {len(snaps)} 筆觀測,無變更。")
-    return len(changes)
+        print(f"[run] 本輪 {n_obs} 筆觀測,無變更。")
+    return len(all_changes)
 
 
 def main() -> None:

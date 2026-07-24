@@ -92,6 +92,8 @@ def format_change(change: Change) -> str:
         headline = "🟢【補貨】"
     elif change.is_imminent:
         headline = "⏰【即將開賣】"
+    elif change.is_new and e.available:
+        headline = "🆕【新商品上架】"
     elif change.is_new:
         headline = "🆕【新情報】"
     else:

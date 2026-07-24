@@ -94,6 +94,28 @@ WATCHES: list[Watch] = [
 ]
 
 
+# --- 搜尋 / 發現式監控目標 --------------------------------------------------
+
+@dataclass
+class Search:
+    """一筆「掃描搜尋頁抓新品」的目標。
+
+    跟 Watch 不同:Watch 是盯「已知商品碼」;Search 是拿關鍵字去掃某商城的
+    搜尋/分類頁,把「以前沒看過的 Beyblade X 商品」當新上架通知你。
+    首次掃描會先建立基準線(不通知),之後才通知真正的新品。
+    """
+
+    platform: str            # "eslite" | (之後可加 momo/pchome 搜尋、toysrus…)
+    keyword: str             # 搜尋關鍵字(如 "beyblade")
+    name: str = ""           # 這組掃描的人類可讀標籤
+
+
+# 掃描清單 —— 這裡放「要在哪些商城、用什麼關鍵字掃新品」。
+SEARCHES: list[Search] = [
+    Search(platform="eslite", keyword="beyblade", name="誠品 Beyblade X 掃描"),
+]
+
+
 # --- 執行參數 ---------------------------------------------------------------
 
 @dataclass

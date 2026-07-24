@@ -29,6 +29,13 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 **狀態機**:`預告(ANNOUNCED) → 即將開賣(IMMINENT) → 已上架/開賣(ON_SALE) → 售罄(SOLD_OUT) → 回補(RESTOCKED)`。
 最想被通知的訊號是 **RESTOCKED 且為原價**(秒殺後常見加價轉賣,回到原價才值得搶)。
 
+**兩種監控方式**:
+- **盯已知商品碼**(`WATCHES`):Watch 指定商品碼,追它的價格/庫存/開賣時間變化。
+- **掃搜尋頁抓新品**(`SEARCHES`,發現式):拿關鍵字掃某商城搜尋頁,「以前沒看過的
+  Beyblade X 商品」就當**新商品上架**通知你(如誠品 eslite)。首次掃描先建立基準線
+  (不通知),之後才通知真正的新品,避免第一輪洗版。**加新商城 = 加一個 adapter**
+  (照 `monitors/eslite.py` 抄)。
+
 ## 檔案
 
 | 檔案 | 狀態 | 說明 |
@@ -43,6 +50,8 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 | `run.py` | ✅ | 排程主迴圈 |
 | `monitors/pchome.py` | ✅ 階段二 | PChome 公開 JSON(Price P/M、Qty);市價 M 可當原價後備 |
 | `monitors/funbox.py` | ✅ 階段二 | Funbox SHOPLINE:解析商品頁 JSON-LD(Offer 的 price/availability) |
+| `monitors/discovery.py` | ✅ | 發現式監控基底(掃搜尋頁抓新品),一站一個 adapter |
+| `monitors/eslite.py` | ✅ | 誠品線上:掃搜尋頁 → 新上架就通知(★需真實 HTML 校準) |
 
 ## 快速開始
 
@@ -76,6 +85,21 @@ python feed_manual.py --key UX-05 --platform seven --name "UX-05 超商限量" \
   在 repo Secrets 填 `TELEGRAM_BOT_TOKEN` 等即可雲端定時跑。
   ⚠️ serverless 不跨輪保存 `radar.db`,所以「售罄→回補」這種**跨輪狀態變更**偵測不到;
   「即將開賣 / 新上架」提醒不受影響。要完整狀態機請用常開主機或自備持久化 DB。
+
+## 校準抓取器(上線前必做)
+
+發現式 adapter(如 `monitors/eslite.py`)的選擇器需要用**真實 HTML** 對準,因為各站
+結構會改版,且開發環境無法連外。步驟:
+
+1. 用瀏覽器開誠品搜尋頁(如 `https://www.eslite.com/search?keyword=beyblade`),F12 開
+   DevTools。
+2. 看資料從哪來:多半是 `__NEXT_DATA__` 內嵌 JSON,或某個 `/api/...` 搜尋 API 回 JSON,
+   或商品頁 JSON-LD。`eslite.py` 三種都試(`extract_products`),但欄位名稱可能要微調。
+3. 把一份真實搜尋結果存成 HTML,丟進 `EsliteMonitor.parse_search()` 跑一次,確認有正確
+   撈到商品 id / 名稱 / 價格。對不到就改 `_walk_product_like` 的候選欄位名。
+
+> 加其他商城(ToysRUs / 博客來 / 蝦皮…):複製 `eslite.py` 換 `SEARCH_URL` 與抽取邏輯即可。
+> 蝦皮反爬強,建議低頻或改人工。
 
 ## 關鍵約束與風險
 
