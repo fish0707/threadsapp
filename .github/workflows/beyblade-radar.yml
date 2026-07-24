@@ -1,0 +1,41 @@
+# Beyblade X 原價開賣雷達 —— 雲端排程(GitHub Actions)
+#
+# 讓雷達「在雲端」定時跑,不必自備常開主機。
+# 設定方式:Repo → Settings → Secrets and variables → Actions,新增:
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  (或 DISCORD_WEBHOOK_URL)
+#   SHOPEE_AFFILIATE_ID (可選)
+#
+# 注意:
+# - GitHub 排程 cron 是 UTC,且尖峰時段可能延遲數分鐘;要精準命中 00:00 開賣
+#   通知,建議把間隔調密(下方為每 10 分鐘),或改用常開主機。
+# - 每輪的行事曆狀態(radar.db)不會跨 workflow 保存 —— serverless 特性。
+#   若要記住「上一輪狀態」以偵測變更,需自備持久化(如 commit db、或改用
+#   雲端 DB)。純「即將開賣 / 上架」提醒不需持久化即可運作。
+
+name: beyblade-radar
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # 每 10 分鐘一輪(UTC)
+  workflow_dispatch: {} # 也可手動觸發測試
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: beyblade-radar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run one radar pass
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SHOPEE_AFFILIATE_ID: ${{ secrets.SHOPEE_AFFILIATE_ID }}
+        run: python run.py --once
