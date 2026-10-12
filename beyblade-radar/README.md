@@ -1,10 +1,64 @@
 # Beyblade X 原價開賣情報・個人雷達
 
+> **目前狀態:日本模式** —— 只盯 UX-15,樂天有貨且 ≤ ¥5,000 就通知。見下方「日本模式」。
+
 自動盯各購物平台,在 **Beyblade X「原價」商品**開賣 / 上架 / **補貨**時**通知你自己**(Telegram / Discord),
 並生成帶**蝦皮分潤連結**的貼文草稿,由你審核後手動貼到 Threads / IG / FB。
 
 > **個人雷達,不公開帳號、不自動發文**。系統只通知你、發文你自己貼。
 > 不做社群自動發文 API(省掉審核最嚴的部分)。
+
+## 🇯🇵 日本模式(目前啟用):UX-15 有貨且 ≤ ¥5,000 就通知
+
+目前雷達只做一件事:盯 **BEYBLADE X UX-15 シャークスケイルデッキセット**
+(官方定價 ¥4,200,2025/8/9 發售)。當**全新品、有庫存、商品標價 ≤ ¥5,000**(不含運費)
+時推 Telegram,而且同一筆商品**只在「進入條件」那一刻通知一次**:
+
+| 情況 | 通知? |
+|---|---|
+| 第一次看到就已有貨且 ≤ ¥5,000 | ✅ |
+| 從 ¥6,240 降到 ¥4,580 | ✅ |
+| 售罄後補貨,且 ≤ ¥5,000 | ✅ |
+| 持續符合(¥4,800 → ¥4,900) | ❌ 不重複 |
+| 有貨但 > ¥5,000、或中古 / 拆賣單顆 | ❌ |
+
+門檻與商品在 `config.py` 的 `TARGETS` / `SEARCHES` / `EXCLUDE_WORDS` 調整。
+
+### 資料來源:樂天市場官方 API
+
+一支 adapter(`monitors/rakuten_jp.py`)涵蓋所有在樂天開店的日本零售商(ジョーシン、
+ビック、EDION、玩具店…)。走官方 API,不爬網頁。
+
+**設定步驟:**
+
+1. 到 [Rakuten Developers](https://webservice.rakuten.co.jp/) 註冊新應用程式
+   (2026/2 改版後**舊 ID 全部失效**,一定要新註冊)。
+2. 「許可された Web サイト」填一個你掌控的固定網址,例如 GitHub Pages
+   `https://fish0707.github.io/`。**這個網址就是 `RAKUTEN_REFERER`**,兩邊不一致會 403。
+3. 取得 `applicationId` 與 `accessKey`,填進 `.env`(本機)與 GitHub Secrets(雲端)。
+4. 校準:`python tools/rakuten_check.py` —— 會印出連線結果、第一筆商品欄位、
+   以及哪些商品符合門檻。**輸出的金鑰已遮蔽,可直接貼給別人看。**
+5. `python run.py --once` 跑一輪;雲端用 GitHub Actions(見下方「部署」)。
+
+> ⚠️ 樂天 2026 新規格(`openapi.rakuten.co.jp`、accessKey、Referer 檢查)取自改版後的
+> 實作紀錄,首次連線請先跑第 4 步確認。常見錯誤:400 = 缺 accessKey / 舊 ID、
+> 403 = Referer 不符、429 = 太頻繁。
+
+### 沒有 API 的通路:手動設定(不寫程式)
+
+| 通路 | 為什麼不自動 | 替代做法 |
+|---|---|---|
+| Amazon JP | PA-API 已於 2026/5 終止;Keepa API €49/月 | 用 **Keepa 免費版** 對 UX-15 設 ¥5,000 Price Watch(記得勾 New 3rd Party) |
+| ホビーサーチ | 無 API | 商品頁登記免費的「注文再開メール」 |
+| Yahoo!ショッピング | 官方 API 要 Yahoo! JAPAN ID,需日本手機號收 SMS | 暫不做 |
+| ヨドバシ / タカラトミーモール | 無公開 API(ヨドバシ已販売終了) | 不做 |
+| メルカリ / 價格.com | C2C 二手 / 彙整站,無 API(見「來源分級」) | 不做 |
+
+---
+
+## 🇹🇼 台灣模式(停用中)
+
+以下是原本的台灣通路設計,程式碼保留,在 `config.py` 把 `WATCHES` / `SEARCHES` 的範例取消註解即可恢復。
 
 ## 為什麼這樣設計(關鍵結論)
 
@@ -52,6 +106,9 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 | `monitors/funbox.py` | ✅ 階段二 | Funbox SHOPLINE:解析商品頁 JSON-LD(Offer 的 price/availability) |
 | `monitors/discovery.py` | ✅ | 發現式監控基底(掃搜尋頁抓新品),一站一個 adapter |
 | `monitors/eslite.py` | ✅ | 誠品線上:掃搜尋頁 → 新上架就通知(★需真實 HTML 校準) |
+| `monitors/rakuten_jp.py` | ✅ 日本 | 樂天市場官方 API(2026 新規格),品名比對 + 排除中古/拆賣 |
+| `alerts.py` | ✅ 日本 | 目標價條件:有貨且 ≤ 門檻,只在「進入條件」時通知一次 |
+| `tools/rakuten_check.py` | ✅ 日本 | 樂天 API 校準工具(金鑰遮蔽輸出) |
 
 ## 快速開始
 
@@ -59,7 +116,7 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 cd beyblade-radar
 pip install -r requirements.txt
 cp .env.example .env          # 填 Telegram/Discord;分潤先留空
-python -m unittest discover -s tests   # 跑測試(21 項,無需金鑰)
+python -m unittest discover -s tests   # 跑測試(70 項,無需金鑰、不打網路)
 
 python run.py --once          # 跑一輪(cron 模式)
 python run.py                 # 常駐,每 POLL_INTERVAL_SEC 一輪
@@ -82,9 +139,13 @@ python feed_manual.py --key UX-05 --platform seven --name "UX-05 超商限量" \
 - **常開主機**(Raspberry Pi / 便宜雲主機):`cron` 每 N 分鐘跑 `python run.py --once`,
   或直接 `python run.py` 常駐。SQLite 會保存上一輪狀態,能正確偵測「售罄→回補」。
 - **GitHub Actions**:已附 [`.github/workflows/beyblade-radar.yml`](../.github/workflows/beyblade-radar.yml),
-  在 repo Secrets 填 `TELEGRAM_BOT_TOKEN` 等即可雲端定時跑。
-  ⚠️ serverless 不跨輪保存 `radar.db`,所以「售罄→回補」這種**跨輪狀態變更**偵測不到;
-  「即將開賣 / 新上架」提醒不受影響。要完整狀態機請用常開主機或自備持久化 DB。
+  每 10 分鐘跑一輪。在 repo Secrets 填 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`、
+  `RAKUTEN_APP_ID`、`RAKUTEN_ACCESS_KEY`、`RAKUTEN_REFERER`。
+  - `radar.db` 用 `actions/cache` 在每輪之間保存,所以「售罄→補貨」、「降進門檻」都偵測得到,
+    也不會重複通知。(快取 7 天沒被讀取會被清掉;每 10 分鐘一輪不會發生。)
+  - ⚠️ **排程只在預設分支觸發**:這個檔案要合併進預設分支 cron 才會自動跑。
+    合併前可在 Actions 頁面按「Run workflow」手動測試。
+  - ⚠️ 公開 repo 連續 60 天沒活動,GitHub 會暫停排程,到 Actions 頁面重新啟用即可。
 
 ## 來源分級(本專案原則)
 
@@ -140,7 +201,7 @@ python tools/probe_feed.py https://要探測的網站/
   三平台同款用相同 `product_key` 自動合併,`by_product_key()` 可查各平台現況。
 - **階段三**:蝦皮分潤過審後,把 `draft.py` 的 `shopee_link` 換成分潤後台產生的正式連結。
 
-共 33 項單元測試(momo / pchome / funbox 解析 + 行事曆狀態機 + 通知 + 草稿),
+共 70 項單元測試(樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
 全部不需金鑰、不打真實網路。
 
 ## 測試

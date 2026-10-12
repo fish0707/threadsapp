@@ -14,7 +14,7 @@ import requests
 from calendar_db import (
     ANNOUNCED, IMMINENT, ON_SALE, SOLD_OUT, RESTOCKED, Change, EventRow,
 )
-from config import SETTINGS
+from config import SETTINGS, Target
 
 _STATUS_LABEL = {
     ANNOUNCED: "🗓 預告",
@@ -23,6 +23,18 @@ _STATUS_LABEL = {
     SOLD_OUT: "🔴 售罄",
     RESTOCKED: "🟢 原價補貨",
 }
+
+# 以日圓計價的平台(其餘維持新台幣)。
+_JPY_PLATFORMS = {"rakuten_jp"}
+
+_PLATFORM_LABEL = {"rakuten_jp": "樂天市場"}
+
+
+def money(platform: str, amount: int) -> str:
+    """依平台幣別格式化金額:樂天 → ¥4,580;台灣通路 → NT$390。"""
+    if platform in _JPY_PLATFORMS:
+        return f"¥{amount:,}"
+    return f"NT${amount:,}"
 
 
 class Notifier:
@@ -44,6 +56,9 @@ class Notifier:
 
     def notify_change(self, change: Change) -> bool:
         return self.send(format_change(change))
+
+    def notify_target(self, change: Change, target: Target) -> bool:
+        return self.send(format_target_alert(change, target))
 
     # --- 各管道實作 ---------------------------------------------------------
 
@@ -110,13 +125,13 @@ def format_change(change: Change) -> str:
 
     # 價格 / 原價旗標
     if e.price is not None:
-        price_line = f"售價:NT${e.price:,}"
+        price_line = f"售價:{money(e.platform, e.price)}"
         if e.is_original_price is True:
             price_line += "（原價✅）"
         elif e.is_original_price is False:
             price_line += "（高於原價⚠️）"
         if change.price_dropped and change.old_price is not None:
-            price_line += f"（↓ 原 NT${change.old_price:,}）"
+            price_line += f"（↓ 原 {money(e.platform, change.old_price)}）"
         lines.append(price_line)
 
     if e.stock is not None:
@@ -129,6 +144,40 @@ def format_change(change: Change) -> str:
     if e.url:
         lines.append(e.url)
 
+    return "\n".join(lines)
+
+
+def format_target_alert(change: Change, target: Target) -> str:
+    """目標價通知(如 UX-15 有貨且 ≤ ¥5,000)。"""
+    e = change.event
+    p = e.platform
+    lines = [f"🎯【{target.product_key} 有貨 ≤ {money(p, target.max_price)}】", e.name]
+
+    if change.is_restock or change.old_status == SOLD_OUT:
+        reason = "售罄後補貨"
+    elif change.price_dropped and change.old_price is not None:
+        reason = f"降價 {money(p, change.old_price)} → {money(p, e.price)}"
+    elif change.is_new:
+        reason = "新發現"
+    else:
+        reason = "轉為有貨"
+    lines.append(f"原因:{reason}")
+
+    shop = (e.raw or {}).get("shop")
+    if shop:
+        lines.append(f"店家:{shop}({_PLATFORM_LABEL.get(p, p)})")
+
+    if e.price is not None:
+        price_line = f"售價:{money(p, e.price)}"
+        postage = (e.raw or {}).get("postage")
+        if postage:
+            price_line += f"({postage})"
+        if target.list_price:
+            price_line += f"・官方定價 {money(p, target.list_price)}"
+        lines.append(price_line)
+
+    if e.url:
+        lines.append(e.url)
     return "\n".join(lines)
 
 

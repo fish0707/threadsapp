@@ -66,14 +66,15 @@ class Watch:
 
 # 監控清單 —— 這裡放你要盯的 Beyblade X 商品。
 # 範例:UX-04(計畫書驗證用;商品碼與開賣時間以上線前實測為準)。
+# 目前專注日本市場,台灣通路先停用(程式碼保留,要恢復把下面範例取消註解即可)。
 WATCHES: list[Watch] = [
-    Watch(
-        product_key="UX-04",
-        platform="momo",
-        item_id="15462754",
-        original_price=390,
-        name="Beyblade X UX-04(範例)",
-    ),
+    # Watch(
+    #     product_key="UX-04",
+    #     platform="momo",
+    #     item_id="15462754",
+    #     original_price=390,
+    #     name="Beyblade X UX-04(範例)",
+    # ),
     # 跨平台同款:用「相同 product_key」串起來,行事曆會自動合併。
     # 打開下面兩筆(填真實 id / 網址)即可讓 PChome、Funbox 一起盯 UX-04。
     #
@@ -105,15 +106,49 @@ class Search:
     首次掃描會先建立基準線(不通知),之後才通知真正的新品。
     """
 
-    platform: str            # "eslite" | (之後可加 momo/pchome 搜尋、toysrus…)
-    keyword: str             # 搜尋關鍵字(如 "beyblade")
+    platform: str            # "rakuten_jp" | "eslite" | …
+    keyword: str             # 搜尋關鍵字
     name: str = ""           # 這組掃描的人類可讀標籤
 
 
-# 掃描清單 —— 這裡放「要在哪些商城、用什麼關鍵字掃新品」。
+# 掃描清單 —— 這裡放「要在哪些商城、用什麼關鍵字掃」。
+# 目前只盯日本樂天的 UX-15(台灣誠品掃描先停用)。
 SEARCHES: list[Search] = [
-    Search(platform="eslite", keyword="beyblade", name="誠品 Beyblade X 掃描"),
+    Search(
+        platform="rakuten_jp",
+        keyword="UX-15 シャークスケイルデッキセット",
+        name="樂天 UX-15",
+    ),
+    # Search(platform="eslite", keyword="beyblade", name="誠品 Beyblade X 掃描"),
 ]
+
+
+# --- 目標條件(價格門檻通知) ------------------------------------------------
+
+@dataclass
+class Target:
+    """「這個商品有貨、且價格 ≤ max_price 時通知我」。
+
+    只在商品「從不符合變成符合」的那一刻通知一次(alerts.select_alerts),
+    持續符合不會重複推播。門檻只看商品標價,不含運費。
+    """
+
+    product_key: str                  # 例 "UX-15"
+    max_price: int                    # 價格上限(含),單位依平台幣別(樂天為日圓)
+    list_price: Optional[int] = None  # 官方定價,通知裡當參考
+    platforms: tuple[str, ...] = ("rakuten_jp",)  # 套用這個目標的平台
+
+
+TARGETS: list[Target] = [
+    # BEYBLADE X UX-15 シャークスケイルデッキセット:官方定價 ¥4,200(2025/8/9 發售)
+    Target(product_key="UX-15", max_price=5000, list_price=4200),
+]
+
+# 品名含這些字就排除:中古品、拆賣單顆(停產品常見把整套拆開賣)。
+# 注意不要放「開封」:會誤殺「未開封」(=全新)這種正是我們要的商品。
+EXCLUDE_WORDS: tuple[str, ...] = (
+    "中古", "ジャンク", "開封済", "開封品", "単品", "バラ", "のみ", "USED",
+)
 
 
 # --- 執行參數 ---------------------------------------------------------------
@@ -146,6 +181,14 @@ class Settings:
     # 蝦皮分潤 ID(過審後填);未填時 draft 只放純導流連結。
     shopee_affiliate_id: str = field(default_factory=lambda: _env("SHOPEE_AFFILIATE_ID"))
 
+    # --- 樂天市場 API(2026 新規格:applicationId + accessKey + Referer) ---
+    rakuten_app_id: str = field(default_factory=lambda: _env("RAKUTEN_APP_ID"))
+    rakuten_access_key: str = field(default_factory=lambda: _env("RAKUTEN_ACCESS_KEY"))
+    # 必須與樂天後台「許可された Web サイト」登記的網址一致,否則 403。
+    rakuten_referer: str = field(default_factory=lambda: _env("RAKUTEN_REFERER"))
+    # 每個關鍵字最多抓幾頁(每頁 30 筆),頁間會間隔 1 秒避免 429。
+    rakuten_max_pages: int = field(default_factory=lambda: _env_int("RAKUTEN_MAX_PAGES", 2))
+
     @property
     def has_telegram(self) -> bool:
         return bool(self.telegram_bot_token and self.telegram_chat_id)
@@ -153,6 +196,10 @@ class Settings:
     @property
     def has_discord(self) -> bool:
         return bool(self.discord_webhook_url)
+
+    @property
+    def has_rakuten(self) -> bool:
+        return bool(self.rakuten_app_id and self.rakuten_access_key)
 
 
 SETTINGS = Settings()

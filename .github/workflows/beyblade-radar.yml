@@ -1,16 +1,18 @@
-# Beyblade X 原價開賣雷達 —— 雲端排程(GitHub Actions)
+# Beyblade X 雷達 —— 雲端排程(GitHub Actions)
 #
-# 讓雷達「在雲端」定時跑,不必自備常開主機。
+# 目前任務:日本樂天 UX-15 有貨且 ≤ ¥5,000 就推 Telegram。
+#
 # 設定方式:Repo → Settings → Secrets and variables → Actions,新增:
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  (或 DISCORD_WEBHOOK_URL)
-#   SHOPEE_AFFILIATE_ID (可選)
+#   RAKUTEN_APP_ID, RAKUTEN_ACCESS_KEY, RAKUTEN_REFERER
 #
 # 注意:
-# - GitHub 排程 cron 是 UTC,且尖峰時段可能延遲數分鐘;要精準命中 00:00 開賣
-#   通知,建議把間隔調密(下方為每 10 分鐘),或改用常開主機。
-# - 每輪的行事曆狀態(radar.db)不會跨 workflow 保存 —— serverless 特性。
-#   若要記住「上一輪狀態」以偵測變更,需自備持久化(如 commit db、或改用
-#   雲端 DB)。純「即將開賣 / 上架」提醒不需持久化即可運作。
+# - 排程(schedule)只會在「預設分支」上觸發。這個檔案要合併進預設分支,
+#   cron 才會自動跑;合併前可用 Actions 頁面的「Run workflow」手動觸發測試。
+# - 公開 repo 連續 60 天沒有任何活動,GitHub 會自動暫停排程,需到 Actions 頁面重新啟用。
+# - cron 用 UTC,尖峰時段可能延遲數分鐘。
+# - radar.db 用 actions/cache 在每輪之間保存:沒有它,每輪都從空資料庫開始,
+#   符合條件的商品會每 10 分鐘重複通知一次。
 
 name: beyblade-radar
 
@@ -18,6 +20,11 @@ on:
   schedule:
     - cron: "*/10 * * * *" # 每 10 分鐘一輪(UTC)
   workflow_dispatch: {} # 也可手動觸發測試
+
+# 同一時間只跑一輪,避免兩輪同時讀寫快取裡的 radar.db。
+concurrency:
+  group: beyblade-radar
+  cancel-in-progress: false
 
 jobs:
   radar:
@@ -32,10 +39,27 @@ jobs:
           python-version: "3.11"
       - name: Install deps
         run: pip install -r requirements.txt
+
+      - name: Restore radar.db
+        uses: actions/cache/restore@v4
+        with:
+          path: beyblade-radar/radar.db
+          key: radar-db-${{ github.run_id }}
+          restore-keys: radar-db-
+
       - name: Run one radar pass
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          SHOPEE_AFFILIATE_ID: ${{ secrets.SHOPEE_AFFILIATE_ID }}
+          RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
+          RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
+          RAKUTEN_REFERER: ${{ secrets.RAKUTEN_REFERER }}
         run: python run.py --once
+
+      - name: Save radar.db
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: beyblade-radar/radar.db
+          key: radar-db-${{ github.run_id }}

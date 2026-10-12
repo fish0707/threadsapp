@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from monitors.base import ProductSnapshot
@@ -48,6 +48,7 @@ class EventRow:
     first_seen_at: int
     last_updated_at: int
     id: Optional[int] = None
+    raw: dict = field(default_factory=dict)  # 平台附加資訊(如樂天的店名、送料)
 
 
 @dataclass
@@ -302,4 +303,15 @@ def _row_to_event(row: sqlite3.Row) -> EventRow:
         status=row["status"],
         first_seen_at=row["first_seen_at"],
         last_updated_at=row["last_updated_at"],
+        raw=_load_raw(row["raw"]),
     )
+
+
+def _load_raw(text) -> dict:
+    if not text:
+        return {}
+    try:
+        val = json.loads(text)
+    except (ValueError, TypeError):
+        return {}
+    return val if isinstance(val, dict) else {}
