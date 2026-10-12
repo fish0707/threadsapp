@@ -143,8 +143,8 @@ python feed_manual.py --key UX-05 --platform seven --name "UX-05 超商限量" \
   `RAKUTEN_APP_ID`、`RAKUTEN_ACCESS_KEY`、`RAKUTEN_REFERER`。
   - `radar.db` 用 `actions/cache` 在每輪之間保存,所以「售罄→補貨」、「降進門檻」都偵測得到,
     也不會重複通知。(快取 7 天沒被讀取會被清掉;每 10 分鐘一輪不會發生。)
-  - ⚠️ **排程只在預設分支觸發**:這個檔案要合併進預設分支 cron 才會自動跑。
-    合併前可在 Actions 頁面按「Run workflow」手動測試。
+  - ⚠️ **workflow 必須在預設分支上**:排程(cron)和 Actions 頁面的「Run workflow」手動按鈕,
+    都要等這個檔案合併進 repo 的預設分支才會出現 / 生效。
   - ⚠️ 公開 repo 連續 60 天沒活動,GitHub 會暫停排程,到 Actions 頁面重新啟用即可。
 
 ## 來源分級(本專案原則)

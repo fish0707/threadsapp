@@ -7,8 +7,8 @@
 #   RAKUTEN_APP_ID, RAKUTEN_ACCESS_KEY, RAKUTEN_REFERER
 #
 # 注意:
-# - 排程(schedule)只會在「預設分支」上觸發。這個檔案要合併進預設分支,
-#   cron 才會自動跑;合併前可用 Actions 頁面的「Run workflow」手動觸發測試。
+# - 這個檔案必須在 repo 的「預設分支」上:排程(schedule)與 Actions 頁面的
+#   「Run workflow」手動按鈕,都要合併進預設分支後才會出現 / 生效。
 # - 公開 repo 連續 60 天沒有任何活動,GitHub 會自動暫停排程,需到 Actions 頁面重新啟用。
 # - cron 用 UTC,尖峰時段可能延遲數分鐘。
 # - radar.db 用 actions/cache 在每輪之間保存:沒有它,每輪都從空資料庫開始,
