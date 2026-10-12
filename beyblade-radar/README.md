@@ -41,8 +41,9 @@
 5. `python run.py --once` 跑一輪;雲端用 GitHub Actions(見下方「部署」)。
 
 > ⚠️ 樂天 2026 新規格(`openapi.rakuten.co.jp`、accessKey、Referer 檢查)取自改版後的
-> 實作紀錄,首次連線請先跑第 4 步確認。常見錯誤:400 = 缺 accessKey / 舊 ID、
-> 403 = Referer 不符、429 = 太頻繁。
+> 實作紀錄,首次連線請先跑第 4 步確認。常見錯誤:400 = 缺 accessKey / 舊 ID;
+> 403 `REQUESTED_SCOPES_NOT_ALLOWED` = 應用程式沒勾「Rakuten Ichiba API」scope(或尚待核准);
+> 403 `HTTP_REFERRER_*` = Referer 網域不在 Allowed websites;429 = 太頻繁。
 
 ### 沒有 API 的通路:手動設定(不寫程式)
 
@@ -116,7 +117,7 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 cd beyblade-radar
 pip install -r requirements.txt
 cp .env.example .env          # 填 Telegram/Discord;分潤先留空
-python -m unittest discover -s tests   # 跑測試(70 項,無需金鑰、不打網路)
+python -m unittest discover -s tests   # 跑測試(73 項,無需金鑰、不打網路)
 
 python run.py --once          # 跑一輪(cron 模式)
 python run.py                 # 常駐,每 POLL_INTERVAL_SEC 一輪
@@ -201,7 +202,7 @@ python tools/probe_feed.py https://要探測的網站/
   三平台同款用相同 `product_key` 自動合併,`by_product_key()` 可查各平台現況。
 - **階段三**:蝦皮分潤過審後,把 `draft.py` 的 `shopee_link` 換成分潤後台產生的正式連結。
 
-共 70 項單元測試(樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
+共 73 項單元測試(樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
 全部不需金鑰、不打真實網路。
 
 ## 測試

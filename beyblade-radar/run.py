@@ -52,6 +52,8 @@ def run_once(cal: Calendar, notifier: Notifier, now: int | None = None) -> int:
     #    - 沒設目標的平台:首次掃描建立基準線(不通知),避免第一輪洗版。
     target_alerts = []
     for mon in DISCOVERY_MONITORS:
+        if not any(s.platform == mon.platform for s in SEARCHES):
+            continue  # 這個平台目前沒設定任何掃描(例如已停用的誠品)
         try:
             dsnaps = mon.fetch_searches(SEARCHES)
         except Exception as exc:

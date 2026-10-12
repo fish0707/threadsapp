@@ -183,6 +183,26 @@ class RequestTest(unittest.TestCase):
         self.assertNotIn("APPID123456", msg)
         self.assertNotIn("SECRETKEY987", msg)
 
+    def test_scope_error_gets_scope_hint_not_referer_hint(self):
+        # 真實回應(2026/10 GitHub Actions log)
+        sess = FakeSession([FakeResponse(403, {
+            "errorCode": 403, "errorMessage": "REQUESTED_SCOPES_NOT_ALLOWED",
+        })])
+        with self.assertRaises(RakutenAPIError) as ctx:
+            RakutenJPMonitor(session=sess, sleep=lambda s: None).request_page("UX-15", 1)
+        msg = str(ctx.exception)
+        self.assertIn("REQUESTED_SCOPES_NOT_ALLOWED", msg)
+        self.assertIn("API Access Scopes", msg)
+        self.assertIn("Rakuten Ichiba API", msg)
+        self.assertNotIn("Referer 不符", msg)
+        self.assertNotIn("{", msg)            # 讀出 errorMessage,不是整包 dict
+
+    def test_referer_error_gets_referer_hint(self):
+        sess = FakeSession([FakeResponse(403, {"errorCode": 403, "errorMessage": "HTTP_REFERRER_NOT_ALLOWED"})])
+        with self.assertRaises(RakutenAPIError) as ctx:
+            RakutenJPMonitor(session=sess, sleep=lambda s: None).request_page("UX-15", 1)
+        self.assertIn("Referer 不符", str(ctx.exception))
+
     def test_redacts_url_encoded_keys(self):
         from monitors.rakuten_jp import redact
         SETTINGS.rakuten_access_key = "ab+c/d=="

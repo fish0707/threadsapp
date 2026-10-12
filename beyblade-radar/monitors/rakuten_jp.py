@@ -39,19 +39,37 @@ _MODEL_IN_KEYWORD = re.compile(r"([A-Z]{2,3})\s*[" + _DASHES + r"]?\s*(\d{1,3})"
 
 _POSTAGE = {0: "送料込", 1: "送料別"}
 
-_ERROR_HINTS = {
+# 先依樂天回的錯誤碼(errorMessage 等)判斷,比單看 HTTP 狀態碼準:
+# 同樣是 403,可能是 scope 沒開,也可能是 Referer 不符。
+_MESSAGE_HINTS = (
+    ("REQUESTED_SCOPES_NOT_ALLOWED",
+     "這個應用程式沒有樂天市場 API 的權限:到 Rakuten Developers → Your Apps → 你的應用程式"
+     " → API Access Scopes 勾選「Rakuten Ichiba API」並存檔(若顯示審核中,需等樂天核准)"),
+    ("HTTP_REFERRER",
+     "Referer 不符:RAKUTEN_REFERER 的網域要列在樂天後台「Allowed websites」裡"),
+)
+
+_STATUS_HINTS = {
     400: "參數錯誤(常見:缺 accessKey,或 applicationId 是 2026/2 以前的舊 ID)",
     401: "認證失敗:applicationId / accessKey 不正確",
-    403: "Referer 不符:RAKUTEN_REFERER 要與樂天後台「許可された Web サイト」完全一致",
+    403: "權限被拒:檢查樂天後台的 API Access Scopes 與 Allowed websites",
     404: "端點不存在:API 版本或路徑可能又改了,請對照樂天官方文件",
     429: "請求太頻繁(限流),降低頻率或減少 RAKUTEN_MAX_PAGES",
 }
 
 
+def error_hint(status: int, detail: str) -> str:
+    upper = (detail or "").upper()
+    for code, hint in _MESSAGE_HINTS:
+        if code in upper:
+            return hint
+    return _STATUS_HINTS.get(status, "")
+
+
 class RakutenAPIError(RuntimeError):
     def __init__(self, status: int, detail: str):
         self.status = status
-        hint = _ERROR_HINTS.get(status, "")
+        hint = error_hint(status, detail)
         super().__init__(f"HTTP {status}: {detail}" + (f" —— {hint}" if hint else ""))
 
 
@@ -205,7 +223,9 @@ def _error_detail(resp: requests.Response) -> str:
     except ValueError:
         return (resp.text or "")[:200]
     if isinstance(body, dict):
-        parts = [str(body.get(k)) for k in ("error", "error_description", "errors") if body.get(k)]
+        # 新規格回 {"errorCode": 403, "errorMessage": "..."};舊規格回 error / error_description。
+        keys = ("errorMessage", "error", "error_description", "errors")
+        parts = [str(body.get(k)) for k in keys if body.get(k)]
         if parts:
             return " / ".join(parts)[:300]
     return str(body)[:200]

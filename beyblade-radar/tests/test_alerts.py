@@ -176,5 +176,28 @@ class RunOnceTest(unittest.TestCase):
         self.assertIn("降價 ¥6,240 → ¥4,580", notifier.sent[0])
 
 
+class IdleMonitorSkipTest(unittest.TestCase):
+    """沒設定掃描的平台(如已停用的誠品)不該被呼叫,也不該每輪印「首次掃描」。"""
+
+    def test_platform_without_searches_is_skipped(self):
+        class Boom:
+            platform = "eslite"
+
+            def fetch_searches(self, searches):
+                raise AssertionError("不該被呼叫")
+
+        fd, path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        cal = Calendar(path)
+        saved = (run.ITEM_MONITORS, run.DISCOVERY_MONITORS)
+        try:
+            run.ITEM_MONITORS, run.DISCOVERY_MONITORS = [], [Boom()]
+            self.assertEqual(run.run_once(cal, FakeNotifier(), now=NOW), 0)
+        finally:
+            run.ITEM_MONITORS, run.DISCOVERY_MONITORS = saved
+            cal.close()
+            os.remove(path)
+
+
 if __name__ == "__main__":
     unittest.main()
