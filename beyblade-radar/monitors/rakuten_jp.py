@@ -189,6 +189,9 @@ def build_params(keyword: str, page: int) -> dict:
         "keyword": keyword,
         "NGKeyword": "中古",
         "availability": 0,       # 有貨無貨都回傳,自己判斷(見檔頭說明)
+        # 價格由低到高:我們只在乎門檻以下的商品,這樣前幾頁一定是最便宜的那些,
+        # 不會因為「相關度排序」把便宜貨擠到沒抓的後面頁數。
+        "sort": "+itemPrice",
         "hits": HITS_PER_PAGE,
         "page": page,
         "formatVersion": 2,

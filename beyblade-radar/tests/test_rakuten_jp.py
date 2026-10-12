@@ -153,6 +153,7 @@ class RequestTest(unittest.TestCase):
         self.assertEqual(call["params"]["availability"], 0)
         self.assertEqual(call["params"]["formatVersion"], 2)
         self.assertEqual(call["params"]["NGKeyword"], "中古")
+        self.assertEqual(call["params"]["sort"], "+itemPrice")   # 便宜的排前面
         self.assertEqual(call["headers"]["Referer"], "https://fish0707.github.io/radar/")
         self.assertEqual(call["headers"]["Origin"], "https://fish0707.github.io")
 
