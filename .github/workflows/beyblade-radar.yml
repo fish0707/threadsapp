@@ -1,0 +1,65 @@
+# Beyblade X 雷達 —— 雲端排程(GitHub Actions)
+#
+# 目前任務:日本樂天 UX-15 有貨且 ≤ ¥5,000 就推 Telegram。
+#
+# 設定方式:Repo → Settings → Secrets and variables → Actions,新增:
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  (或 DISCORD_WEBHOOK_URL)
+#   RAKUTEN_APP_ID, RAKUTEN_ACCESS_KEY, RAKUTEN_REFERER
+#
+# 注意:
+# - 這個檔案必須在 repo 的「預設分支」上:排程(schedule)與 Actions 頁面的
+#   「Run workflow」手動按鈕,都要合併進預設分支後才會出現 / 生效。
+# - 公開 repo 連續 60 天沒有任何活動,GitHub 會自動暫停排程,需到 Actions 頁面重新啟用。
+# - cron 用 UTC,尖峰時段可能延遲數分鐘。
+# - radar.db 用 actions/cache 在每輪之間保存:沒有它,每輪都從空資料庫開始,
+#   符合條件的商品會每 10 分鐘重複通知一次。
+
+name: beyblade-radar
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # 每 10 分鐘一輪(UTC)
+  workflow_dispatch: {} # 也可手動觸發測試
+
+# 同一時間只跑一輪,避免兩輪同時讀寫快取裡的 radar.db。
+concurrency:
+  group: beyblade-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: beyblade-radar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Restore radar.db
+        uses: actions/cache/restore@v4
+        with:
+          path: beyblade-radar/radar.db
+          key: radar-db-${{ github.run_id }}
+          restore-keys: radar-db-
+
+      - name: Run one radar pass
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
+          RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
+          RAKUTEN_REFERER: ${{ secrets.RAKUTEN_REFERER }}
+        run: python run.py --once
+
+      - name: Save radar.db
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: beyblade-radar/radar.db
+          key: radar-db-${{ github.run_id }}

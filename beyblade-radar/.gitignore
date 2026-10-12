@@ -1,0 +1,16 @@
+# 金鑰 / 環境變數
+.env
+.env.local
+.env.*.local
+
+# 資料庫(行事曆狀態)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
