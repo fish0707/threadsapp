@@ -147,7 +147,7 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 | `monitors/rakuten_jp.py` | ✅ 日本 | 樂天市場官方 API(2026 新規格),品名比對 + 排除中古/拆賣 |
 | `alerts.py` | ✅ 日本 | 目標價條件:有貨且 ≤ 門檻,只在「進入條件」時通知一次 |
 | `tools/rakuten_check.py` | ✅ 日本 | 樂天 API 校準工具(金鑰遮蔽輸出) |
-| `monitors/biccamera.py` | ✅ 日本 | Bic Camera 商品頁:JSON-LD / 關鍵字判斷可預購、有貨;遵守 robots.txt;被擋時記錯不寫假狀態 |
+| `monitors/biccamera.py` | ✅ 日本 | Bic Camera 商品頁:以「第一個下單按鈕可不可按」判斷(灰色按鈕 = 不能買),輔以 JSON-LD / 文字;遵守 robots.txt;被擋時記錯不寫假狀態 |
 | `tools/biccamera_check.py` | ✅ 日本 | Bic 校準工具(家裡電腦執行) |
 | `health.py` | ✅ | 連續失敗警示 / 恢復通知 |
 | `start_radar.bat` | ✅ | Windows 常駐啟動檔(自動重啟) |
@@ -158,7 +158,7 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 cd beyblade-radar
 pip install -r requirements.txt
 cp .env.example .env          # 填 Telegram/Discord;分潤先留空
-python -m unittest discover -s tests   # 跑測試(104 項,無需金鑰、不打網路)
+python -m unittest discover -s tests   # 跑測試(113 項,無需金鑰、不打網路)
 
 python run.py --once          # 跑一輪(cron 模式)
 python run.py                 # 常駐,每 POLL_INTERVAL_SEC 一輪
@@ -243,7 +243,7 @@ python tools/probe_feed.py https://要探測的網站/
   三平台同款用相同 `product_key` 自動合併,`by_product_key()` 可查各平台現況。
 - **階段三**:蝦皮分潤過審後,把 `draft.py` 的 `shopee_link` 換成分潤後台產生的正式連結。
 
-共 104 項單元測試(Bic 頁面判斷與 robots + 健康警示 + 樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
+共 113 項單元測試(Bic 頁面判斷與 robots + 健康警示 + 樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
 全部不需金鑰、不打真實網路。
 
 ## 測試

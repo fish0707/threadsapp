@@ -172,6 +172,8 @@ def format_target_alert(change: Change, target: Target) -> str:
 
     if raw.get("status_text"):
         lines.append(f"狀態:{raw['status_text']}")
+    if raw.get("release"):
+        lines.append(f"發售日:{raw['release']}")
 
     label = _PLATFORM_LABEL.get(p, p)
     shop = raw.get("shop")

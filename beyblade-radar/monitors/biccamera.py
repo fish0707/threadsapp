@@ -48,21 +48,42 @@ _LD_AVAILABILITY = {
     "DISCONTINUED": (UNAVAILABLE, "販売終了"),
 }
 
-# 頁面文字規則(依序檢查,先命中先算)。「店舗在庫」是實體店庫存,不是網購,排除。
+# 判斷順序(實際 Bic 頁面校準後的結論,2026/10 使用者截圖):
+#   不能買的時候「カートに入れる」按鈕「照樣存在、只是變灰色」,
+#   所以絕不能看到這幾個字就當有貨 —— 要看按鈕本身可不可按。
+#
+# 1) 明確的狀態句(「…しました」):頁面直接宣告結束 → 不可下單
+_STATUS_NEGATIVE: tuple[tuple[str, str], ...] = (
+    (r"販売を終了しました|販売終了しました|販売終了商品", "販売終了"),
+    (r"予約受付を終了しました|予約受付は終了|予約の受付を終了しました", "予約受付終了"),
+    (r"完売しました|売り切れました", "売り切れ"),
+)
+# 2) 下單按鈕(購物車 / 預約):第一個按鈕的「可不可按」說了算
+_ORDER_BUTTON_LABEL = re.compile(r"カートに入れる|予約する")
+# 3) JSON-LD(見 _LD_AVAILABILITY)
+# 4) 其餘文字線索(較弱;注意頁尾購買須知是固定文字,所以不用單獨的「品切れ」之類字眼)
+#    「店舗在庫」是實體店庫存,不是網購,排除。
 _TEXT_RULES: tuple[tuple[str, str, str], ...] = (
-    # 否定:已結束 / 沒貨 / 還沒開始
-    (UNAVAILABLE, r"販売を終了|販売終了", "販売終了"),
-    (UNAVAILABLE, r"予約受付を終了|予約受付終了|予約の受付を終了", "予約受付終了"),
-    (UNAVAILABLE, r"完売|売り切れ|売切れ|品切れ", "売り切れ"),
-    (UNAVAILABLE, r"(?<!店舗)在庫なし", "在庫なし"),
+    (PREORDER, r"予約受付中|ご予約はこちら", "予約受付中"),
     (UNAVAILABLE, r"予約受付前|予約開始前|近日予約受付", "予約受付前"),
-    # 肯定:可預購
-    (PREORDER, r"予約受付中|予約する|ご予約はこちら", "予約受付中"),
-    # 肯定:有貨 / 可訂
-    (INSTOCK, r"カートに入れる", "カートに入れる"),
+    (UNAVAILABLE, r"(?<!店舗)在庫なし|在庫切れ", "在庫なし"),
     (INSTOCK, r"(?<!店舗)在庫あり", "在庫あり"),
     (INSTOCK, r"お取り寄せ", "お取り寄せ"),
 )
+# 校準工具要列出的關鍵字(含按鈕文字,方便對照)
+_CALIBRATION_KEYWORDS = (
+    [p for p, _ in _STATUS_NEGATIVE] + [r"カートに入れる|予約する"] + [p for _, p, _ in _TEXT_RULES]
+)
+
+# 按鈕「不可按」的線索:disabled 屬性、aria-disabled、或 class 名稱
+_DISABLED_ATTR_RE = re.compile(r"\sdisabled(?:\s|=|>|/)|aria-disabled\s*=\s*[\"']?true", re.IGNORECASE)
+_DISABLED_CLASS_RE = re.compile(
+    r"disable|inactive|soldout|sold[-_]out|nocart|no[-_]cart|unavailable|gr[ae]y|[-_]off\b",
+    re.IGNORECASE,
+)
+_CAMEL_OFF_RE = re.compile(r"[a-z]Off\b")          # 例:btnCartOff
+_CLASS_ATTR_RE = re.compile(r"class\s*=\s*[\"']([^\"']*)[\"']", re.IGNORECASE)
+_CLICKABLE_START_RE = re.compile(r"<(button|a|input)\b", re.IGNORECASE)
 
 _BLOCK_MARKERS = (
     "access denied", "reference #", "request unsuccessful", "pardon our interruption",
@@ -75,9 +96,15 @@ _LD_JSON_RE = re.compile(
 )
 _SCRIPT_STYLE_RE = re.compile(r"<(script|style|noscript)\b.*?</\1>", re.IGNORECASE | re.DOTALL)
 _TAG_RE = re.compile(r"<[^>]+>")
+# 售價:優先「価格 : 6,270円」,且前面不是「メーカー」(那是定價);再退回一般寫法。
 _PRICE_RES = (
+    re.compile(r"(?<!メーカー)価格\s*[:：]?\s*([\d,]{3,})\s*円"),
     re.compile(r"([\d,]{3,})\s*円\s*[(（]\s*税込"),
     re.compile(r"[¥￥]\s*([\d,]{3,})"),
+)
+_LIST_PRICE_RE = re.compile(r"メーカー価格\s*[:：]?\s*([\d,]{3,})\s*円")
+_RELEASE_RE = re.compile(
+    r"メーカー発売日\s*[:：]?\s*(\d{4}年\d{1,2}月(?:\d{1,2}日)?(?:上旬|中旬|下旬)?|\d{4}/\d{1,2}(?:/\d{1,2})?)"
 )
 
 
@@ -91,12 +118,15 @@ class PageState:
 
     mode: str                         # preorder | instock | unavailable | unknown
     status_text: str = ""             # 顯示用狀態(例:予約受付中)
-    price: Optional[int] = None
+    price: Optional[int] = None       # 售價(Bic 的「価格」)
+    list_price: Optional[int] = None  # 定價(「メーカー価格」)
+    release: str = ""                 # 發售日(「メーカー発売日」)
     name: str = ""
-    source: str = ""                  # "json-ld" | "text" | ""
+    source: str = ""                  # "status" | "button" | "json-ld" | "text" | ""
     blocked: bool = False
     ld_availability: str = ""         # JSON-LD 原始值(校準用)
     matches: list[str] = field(default_factory=list)  # 命中的關鍵字與前後文(校準用)
+    buttons: list[dict] = field(default_factory=list)  # 找到的下單按鈕與判定(校準用)
 
     @property
     def orderable(self) -> bool:
@@ -188,24 +218,48 @@ class BicCameraMonitor:
         if not product and any(m in low for m in _BLOCK_MARKERS):
             return PageState(mode=UNKNOWN, blocked=True)
 
+        no_script = _SCRIPT_STYLE_RE.sub(" ", page)   # JS 字串裡的「カートに入れる」不算
         text = _visible_text(page)
-        matches = _keyword_matches(text)
         if price is None:
             price = _price_from_text(text)
+        list_m = _LIST_PRICE_RE.search(text)
+        release_m = _RELEASE_RE.search(text)
+        base = dict(
+            price=price, name=name, ld_availability=ld_avail,
+            list_price=_to_int(list_m.group(1)) if list_m else None,
+            release=release_m.group(1) if release_m else "",
+            matches=_keyword_matches(text), buttons=_order_buttons(no_script),
+        )
 
+        # 1) 頁面明確宣告結束
+        for pattern, label in _STATUS_NEGATIVE:
+            if re.search(pattern, text):
+                return PageState(mode=UNAVAILABLE, status_text=label, source="status", **base)
+
+        # 2) 第一個下單按鈕說了算(主商品的按鈕在推薦區之前)
+        if base["buttons"]:
+            first = base["buttons"][0]
+            if not first["enabled"]:
+                return PageState(mode=UNAVAILABLE, status_text="カートボタン無効(受付前/在庫なし)",
+                                 source="button", **base)
+            if first["label"] == "予約する" or "発売日以降" in text:
+                return PageState(mode=PREORDER, status_text="予約受付中(発売日以降お届け)",
+                                 source="button", **base)
+            return PageState(mode=INSTOCK, status_text="在庫あり(カートに入れる)",
+                             source="button", **base)
+
+        # 3) JSON-LD
         key = ld_avail.rsplit("/", 1)[-1].upper()
         if key in _LD_AVAILABILITY:
             mode, label = _LD_AVAILABILITY[key]
-            return PageState(mode=mode, status_text=label, price=price, name=name,
-                             source="json-ld", ld_availability=ld_avail, matches=matches)
+            return PageState(mode=mode, status_text=label, source="json-ld", **base)
 
+        # 4) 其餘文字線索
         for mode, pattern, label in _TEXT_RULES:
             if re.search(pattern, text):
-                return PageState(mode=mode, status_text=label, price=price, name=name,
-                                 source="text", ld_availability=ld_avail, matches=matches)
+                return PageState(mode=mode, status_text=label, source="text", **base)
 
-        return PageState(mode=UNKNOWN, price=price, name=name, ld_availability=ld_avail,
-                         matches=matches)
+        return PageState(mode=UNKNOWN, **base)
 
     @staticmethod
     def to_snapshot(state: PageState, w: Watch) -> ProductSnapshot:
@@ -220,7 +274,8 @@ class BicCameraMonitor:
             stock=None,
             on_sale_ts=None,
             available=state.orderable,
-            raw={"status_text": state.status_text, "mode": state.mode},
+            raw={"status_text": state.status_text, "mode": state.mode,
+                 **({"release": state.release} if state.release else {})},
         )
 
 
@@ -250,13 +305,57 @@ def _visible_text(page: str) -> str:
 
 def _keyword_matches(text: str) -> list[str]:
     out = []
-    for _, pattern, _label in _TEXT_RULES:
+    for pattern in _CALIBRATION_KEYWORDS:
         for m in re.finditer(pattern, text):
             s, e = max(0, m.start() - 15), min(len(text), m.end() + 15)
             out.append(f"「{m.group(0)}」…{text[s:e].strip()}…")
             if len(out) >= 20:
                 return out
     return out
+
+
+def _order_buttons(page: str) -> list[dict]:
+    """找出頁面上的下單按鈕(依出現順序),判斷每個可不可按。
+
+    每個按鈕取「它所在的可點元素(button / a / input)開始標籤」到按鈕文字為止的片段,
+    檢查 disabled 屬性、aria-disabled、或 class 名稱。
+    """
+    out: list[dict] = []
+    for m in _ORDER_BUTTON_LABEL.finditer(page):
+        window_start = max(0, m.start() - 800)
+        starts = list(_CLICKABLE_START_RE.finditer(page, window_start, m.start()))
+        if not starts:
+            continue                      # 不在可點元素裡(例如說明文字)→ 不是按鈕
+        start = starts[-1].start()
+        between = page[start:m.start()]
+        if ">" not in between:            # 文字在標籤屬性裡(例 <input value="カートに入れる">)
+            end = page.find(">", m.end())
+            segment = page[start:end + 1 if end != -1 else m.end()]
+        else:
+            tag = starts[-1].group(1).lower()
+            if tag == "input":
+                continue                  # <input> 沒有內文;文字在它之後就不是它的標籤
+            # 文字前面若已有該元素的結束標籤,代表文字不在這個按鈕裡
+            if re.search(rf"</{tag}\s*>", between, re.IGNORECASE):
+                continue
+            segment = between
+        reason = _disabled_reason(segment)
+        out.append({
+            "label": m.group(0),
+            "enabled": reason is None,
+            "reason": reason or "",
+            "snippet": re.sub(r"\s+", " ", segment)[:200],
+        })
+    return out
+
+
+def _disabled_reason(segment: str) -> Optional[str]:
+    if _DISABLED_ATTR_RE.search(segment):
+        return "disabled 屬性"
+    for cls in _CLASS_ATTR_RE.findall(segment):
+        if _DISABLED_CLASS_RE.search(cls) or _CAMEL_OFF_RE.search(cls):
+            return f'class="{cls}"'
+    return None
 
 
 def _price_from_text(text: str) -> Optional[int]:

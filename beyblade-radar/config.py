@@ -156,10 +156,11 @@ class Target:
 TARGETS: list[Target] = [
     # BEYBLADE X UX-15 シャークスケイルデッキセット:官方定價 ¥4,200(2025/8/9 發售)
     Target(product_key="UX-15", max_price=5000, list_price=4200),
-    # CX-20 カスタマイズセットC:Bic Camera 一開放預購 / 有貨就通知(Bic 賣定價,不設上限)
-    Target(product_key="CX-20", max_price=None, platforms=("biccamera",)),
-    # CX-20 カスタマイズセットC:樂天各店 ≤ ¥7,000
-    Target(product_key="CX-20", max_price=7000, platforms=("rakuten_jp",)),
+    # CX-20 カスタマイズセットC:メーカー価格 ¥6,600(Bic 售 ¥6,270,2026 年 11 月發售)
+    # Bic Camera:一開放預購 / 有貨就通知(Bic 賣定價以下,不設上限)
+    Target(product_key="CX-20", max_price=None, list_price=6600, platforms=("biccamera",)),
+    # 樂天各店:≤ ¥7,000(≈ 定價 +6%,定價店家會通知,三倍轉賣價不會)
+    Target(product_key="CX-20", max_price=7000, list_price=6600, platforms=("rakuten_jp",)),
 ]
 
 # 品名含這些字就排除:中古品、拆賣單顆(停產品常見把整套拆開賣)。

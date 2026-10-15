@@ -70,8 +70,15 @@ def main() -> int:
         return 2
     print(f"  JSON-LD availability : {state.ld_availability or '(頁面沒有)'}")
     print(f"  商品名稱(JSON-LD)  : {state.name or '(頁面沒有)'}")
-    print(f"  價格                 : {f'¥{state.price:,}' if state.price else '(抓不到)'}")
+    print(f"  售價                 : {f'¥{state.price:,}' if state.price else '(抓不到)'}")
+    print(f"  定價(メーカー価格)  : {f'¥{state.list_price:,}' if state.list_price else '(抓不到)'}")
+    print(f"  發售日               : {state.release or '(抓不到)'}")
     print(f"  判斷依據             : {state.source or '(無)'}")
+    print(f"  下單按鈕(依出現順序,第一個說了算):{'' if state.buttons else '(沒找到)'}")
+    for i, b in enumerate(state.buttons[:6], 1):
+        verdict = "可按 ✅" if b["enabled"] else f"不可按 ⛔({b['reason']})"
+        print(f"    {i}. 「{b['label']}」{verdict}")
+        print(f"       {b['snippet']}")
     print("  命中的關鍵字:")
     for m in state.matches or ["  (沒有命中任何關鍵字)"]:
         print(f"    - {m}")
