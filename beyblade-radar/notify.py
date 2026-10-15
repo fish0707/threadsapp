@@ -25,9 +25,9 @@ _STATUS_LABEL = {
 }
 
 # 以日圓計價的平台(其餘維持新台幣)。
-_JPY_PLATFORMS = {"rakuten_jp"}
+_JPY_PLATFORMS = {"rakuten_jp", "biccamera"}
 
-_PLATFORM_LABEL = {"rakuten_jp": "樂天市場"}
+_PLATFORM_LABEL = {"rakuten_jp": "樂天市場", "biccamera": "ビックカメラ.com"}
 
 
 def money(platform: str, amount: int) -> str:
@@ -148,24 +148,34 @@ def format_change(change: Change) -> str:
 
 
 def format_target_alert(change: Change, target: Target) -> str:
-    """目標價通知(如 UX-15 有貨且 ≤ ¥5,000)。"""
+    """目標通知:限價(如 UX-15 有貨且 ≤ ¥5,000)或不限價(如 Bic CX-20 開放預購)。"""
     e = change.event
     p = e.platform
-    lines = [f"🎯【{target.product_key} 有貨 ≤ {money(p, target.max_price)}】", e.name]
+    raw = e.raw or {}
+    preorder = raw.get("mode") == "preorder"
+
+    if target.max_price is None:
+        headline = f"🎯【{target.product_key} {'可以預購了' if preorder else '有貨了'}!】"
+    else:
+        headline = f"🎯【{target.product_key} 有貨 ≤ {money(p, target.max_price)}】"
+    lines = [headline, e.name]
 
     if change.is_restock or change.old_status == SOLD_OUT:
-        reason = "售罄後補貨"
+        reason = "重新開放預購" if preorder else "售罄後補貨"
     elif change.price_dropped and change.old_price is not None:
         reason = f"降價 {money(p, change.old_price)} → {money(p, e.price)}"
     elif change.is_new:
         reason = "新發現"
     else:
-        reason = "轉為有貨"
+        reason = "開放預購" if preorder else "轉為有貨"
     lines.append(f"原因:{reason}")
 
-    shop = (e.raw or {}).get("shop")
-    if shop:
-        lines.append(f"店家:{shop}({_PLATFORM_LABEL.get(p, p)})")
+    if raw.get("status_text"):
+        lines.append(f"狀態:{raw['status_text']}")
+
+    label = _PLATFORM_LABEL.get(p, p)
+    shop = raw.get("shop")
+    lines.append(f"店家:{shop}({label})" if shop else f"店家:{label}")
 
     if e.price is not None:
         price_line = f"售價:{money(p, e.price)}"

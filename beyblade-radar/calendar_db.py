@@ -154,6 +154,10 @@ class Calendar:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_product_key ON events(product_key)"
         )
+        # 小型鍵值表:存跨輪狀態(例如各平台連續失敗次數,給健康警示用)。
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
         self._conn.commit()
 
     # --- 讀取 ---
@@ -173,6 +177,19 @@ class Calendar:
             (product_key,),
         )
         return [_row_to_event(r) for r in cur.fetchall()]
+
+    def get_meta(self, key: str, default: str = "") -> str:
+        cur = self._conn.execute("SELECT value FROM meta WHERE key=?", (key,))
+        row = cur.fetchone()
+        return row["value"] if row else default
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._conn.execute(
+            "INSERT INTO meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+        self._conn.commit()
 
     def count_platform(self, platform: str) -> int:
         """某平台目前已存幾筆(用來判斷發現式監控是否為首次掃描)。"""

@@ -1,6 +1,6 @@
 # Beyblade X 原價開賣情報・個人雷達
 
-> **目前狀態:日本模式** —— 只盯 UX-15,樂天有貨且 ≤ ¥5,000 就通知。見下方「日本模式」。
+> **目前狀態:日本模式** —— Bic Camera CX-20C 一開放預購就通知(家裡電腦,每 60 秒);樂天 UX-15 ≤ ¥5,000、CX-20C ≤ ¥7,000 有貨就通知(GitHub Actions,每 10 分鐘)。
 
 自動盯各購物平台,在 **Beyblade X「原價」商品**開賣 / 上架 / **補貨**時**通知你自己**(Telegram / Discord),
 並生成帶**蝦皮分潤連結**的貼文草稿,由你審核後手動貼到 Threads / IG / FB。
@@ -8,9 +8,45 @@
 > **個人雷達,不公開帳號、不自動發文**。系統只通知你、發文你自己貼。
 > 不做社群自動發文 API(省掉審核最嚴的部分)。
 
-## 🇯🇵 日本模式(目前啟用):UX-15 有貨且 ≤ ¥5,000 就通知
+## 🇯🇵 日本模式(目前啟用)
 
-目前雷達只做一件事:盯 **BEYBLADE X UX-15 シャークスケイルデッキセット**
+| 盯什麼 | 條件 | 在哪跑 | 多快 |
+|---|---|---|---|
+| **Bic Camera** CX-20 カスタマイズセットC([商品頁](https://www.biccamera.com/bc/item/15680151/)) | 可預購或有貨(不限價) | **家裡電腦** | 每 60 秒 |
+| **樂天** UX-15 シャークスケイルデッキセット | 有貨且 ≤ ¥5,000 | GitHub Actions | 每 10 分鐘 |
+| **樂天** CX-20 カスタマイズセットC | 有貨且 ≤ ¥7,000 | GitHub Actions | 每 10 分鐘 |
+
+用 `RADAR_PLATFORMS` 分工(家裡電腦 `biccamera`、雲端 `rakuten_jp`),兩邊不會重複通知。
+任何一邊**連續失敗 3 輪**(被擋、改版、斷線)會送一則 ⚠️「監控失敗」,恢復時送 ✅。
+
+### 🏠 家裡電腦執行(Bic Camera)
+
+Bic Camera 沒有 API,只能讀商品頁,而且它的防機器人機制會擋雲端機房 IP(GitHub Actions 就是),
+所以這部分要用**家用網路**跑。雷達會遵守 Bic 的 robots.txt。
+
+1. 安裝 [Python 3.11 以上](https://www.python.org/downloads/)(安裝畫面**勾選「Add python.exe to PATH」**)。
+2. GitHub repo 頁面 → **Code → Download ZIP** → 解壓縮,進到 `beyblade-radar` 資料夾。
+3. 在資料夾空白處按右鍵 →「在終端機中開啟」,執行:`python -m pip install -r requirements.txt`
+4. 把 `.env.example` 複製一份改名為 `.env`,用記事本填:
+   ```
+   TELEGRAM_BOT_TOKEN=(你的 beyblade bot token)
+   TELEGRAM_CHAT_ID=(你的 chat id)
+   RADAR_PLATFORMS=biccamera
+   POLL_INTERVAL_SEC=60
+   ```
+5. `python run.py --test-notify` → Telegram 應收到測試訊息。
+6. `python tools/biccamera_check.py` → 確認抓得到、判斷正確(**第一次請把輸出貼回來校準**)。
+7. **雙擊 `start_radar.bat`** 開始常駐(視窗開著就在監控;意外結束會自動重啟)。
+8. 讓它一直跑:Windows 設定 → 系統 → 電源 →「睡眠」設為**永不**;
+   開機自動啟動:按 `Win+R` 輸入 `shell:startup`,把 `start_radar.bat` 的**捷徑**放進去。
+
+> Mac:步驟相同,第 7 步改在終端機執行 `caffeinate -i python3 run.py`(防止休眠)。
+
+---
+
+### 樂天:UX-15 有貨且 ≤ ¥5,000 就通知
+
+盯 **BEYBLADE X UX-15 シャークスケイルデッキセット**
 (官方定價 ¥4,200,2025/8/9 發售)。當**全新品、有庫存、商品標價 ≤ ¥5,000**(不含運費)
 時推 Telegram,而且同一筆商品**只在「進入條件」那一刻通知一次**:
 
@@ -49,7 +85,8 @@
 
 | 通路 | 為什麼不自動 | 替代做法 |
 |---|---|---|
-| Amazon JP | PA-API 已於 2026/5 終止;Keepa API €49/月 | 用 **Keepa 免費版** 對 UX-15 設 ¥5,000 Price Watch(記得勾 New 3rd Party) |
+| Amazon JP | PA-API 已於 2026/5 終止;Keepa API €49/月 | 用 **Keepa 免費版** 設 Price Watch:UX-15 ≤ ¥5,000、CX-20C([B0HMGJCGVN](https://www.amazon.co.jp/dp/B0HMGJCGVN))≤ ¥7,000(記得勾 New 3rd Party) |
+| Bic Camera(備援) | 雷達已自動盯,但家裡電腦關機時會停 | Bic 官方 App 的「ほしいもの」登記 CX-20C,入荷時官方推播 |
 | ホビーサーチ | 無 API | 商品頁登記免費的「注文再開メール」 |
 | Yahoo!ショッピング | 官方 API 要 Yahoo! JAPAN ID,需日本手機號收 SMS | 暫不做 |
 | ヨドバシ / タカラトミーモール | 無公開 API(ヨドバシ已販売終了) | 不做 |
@@ -110,6 +147,10 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 | `monitors/rakuten_jp.py` | ✅ 日本 | 樂天市場官方 API(2026 新規格),品名比對 + 排除中古/拆賣 |
 | `alerts.py` | ✅ 日本 | 目標價條件:有貨且 ≤ 門檻,只在「進入條件」時通知一次 |
 | `tools/rakuten_check.py` | ✅ 日本 | 樂天 API 校準工具(金鑰遮蔽輸出) |
+| `monitors/biccamera.py` | ✅ 日本 | Bic Camera 商品頁:JSON-LD / 關鍵字判斷可預購、有貨;遵守 robots.txt;被擋時記錯不寫假狀態 |
+| `tools/biccamera_check.py` | ✅ 日本 | Bic 校準工具(家裡電腦執行) |
+| `health.py` | ✅ | 連續失敗警示 / 恢復通知 |
+| `start_radar.bat` | ✅ | Windows 常駐啟動檔(自動重啟) |
 
 ## 快速開始
 
@@ -117,7 +158,7 @@ run.py = 排程主迴圈(常駐 or --once 給 cron/GitHub Actions)
 cd beyblade-radar
 pip install -r requirements.txt
 cp .env.example .env          # 填 Telegram/Discord;分潤先留空
-python -m unittest discover -s tests   # 跑測試(73 項,無需金鑰、不打網路)
+python -m unittest discover -s tests   # 跑測試(104 項,無需金鑰、不打網路)
 
 python run.py --once          # 跑一輪(cron 模式)
 python run.py                 # 常駐,每 POLL_INTERVAL_SEC 一輪
@@ -202,7 +243,7 @@ python tools/probe_feed.py https://要探測的網站/
   三平台同款用相同 `product_key` 自動合併,`by_product_key()` 可查各平台現況。
 - **階段三**:蝦皮分潤過審後,把 `draft.py` 的 `shopee_link` 換成分潤後台產生的正式連結。
 
-共 73 項單元測試(樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
+共 104 項單元測試(Bic 頁面判斷與 robots + 健康警示 + 樂天解析與請求 + 目標價通知 + 台灣各站解析 + 行事曆狀態機 + 通知 + 草稿),
 全部不需金鑰、不打真實網路。
 
 ## 測試

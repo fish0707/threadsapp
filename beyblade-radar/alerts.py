@@ -1,6 +1,7 @@
 """目標價通知:商品「從不符合變成符合」的那一刻才通知一次。
 
-符合 = 有貨(ON_SALE / RESTOCKED)且 價格 ≤ Target.max_price。
+符合 = 可下單(ON_SALE / RESTOCKED,含可預購)且 價格 ≤ Target.max_price
+(max_price 為 None 時不限價)。
 
 用 calendar_db 回傳的 Change(帶 old_status / old_price)判斷「之前符不符合」,
 不需要額外的資料表:
@@ -22,7 +23,11 @@ _IN_STOCK = (ON_SALE, RESTOCKED)
 
 
 def qualifies(status: Optional[str], price: Optional[int], target: Target) -> bool:
-    return status in _IN_STOCK and price is not None and price <= target.max_price
+    if status not in _IN_STOCK:
+        return False
+    if target.max_price is None:      # 不限價:能下單就算
+        return True
+    return price is not None and price <= target.max_price
 
 
 def target_for(event: EventRow, targets: list[Target]) -> Optional[Target]:
