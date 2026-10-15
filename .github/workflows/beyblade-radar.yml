@@ -1,6 +1,8 @@
 # Beyblade X 雷達 —— 雲端排程(GitHub Actions)
 #
-# 目前任務:日本樂天 UX-15 有貨且 ≤ ¥5,000 就推 Telegram。
+# 雲端只負責樂天(官方 API):UX-15 有貨且 ≤ ¥5,000、CX-20C 有貨且 ≤ ¥7,000 就推 Telegram。
+# Bic Camera 由家裡電腦負責(Bic 會擋雲端機房 IP),所以這裡用 RADAR_PLATFORMS 排除它,
+# 否則每輪都會被擋、觸發「監控失敗」警示。
 #
 # 設定方式:Repo → Settings → Secrets and variables → Actions,新增:
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  (或 DISCORD_WEBHOOK_URL)
@@ -55,6 +57,7 @@ jobs:
           RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
           RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
           RAKUTEN_REFERER: ${{ secrets.RAKUTEN_REFERER }}
+          RADAR_PLATFORMS: rakuten_jp
         run: python run.py --once
 
       - name: Save radar.db

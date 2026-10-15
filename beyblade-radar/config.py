@@ -68,6 +68,14 @@ class Watch:
 # 範例:UX-04(計畫書驗證用;商品碼與開賣時間以上線前實測為準)。
 # 目前專注日本市場,台灣通路先停用(程式碼保留,要恢復把下面範例取消註解即可)。
 WATCHES: list[Watch] = [
+    # ビックカメラ.com:CX-20 カスタマイズセットC(預購型商品)。
+    # 只能從家用網路抓(Bic 會擋雲端機房 IP),所以只在家裡電腦執行(RADAR_PLATFORMS=biccamera)。
+    Watch(
+        product_key="CX-20",
+        platform="biccamera",
+        item_id="15680151",
+        name="BEYBLADE X CX-20 カスタマイズセットC",
+    ),
     # Watch(
     #     product_key="UX-04",
     #     platform="momo",
@@ -112,12 +120,17 @@ class Search:
 
 
 # 掃描清單 —— 這裡放「要在哪些商城、用什麼關鍵字掃」。
-# 目前只盯日本樂天的 UX-15(台灣誠品掃描先停用)。
+# 目前盯日本樂天的 UX-15 與 CX-20C(台灣誠品掃描先停用)。
 SEARCHES: list[Search] = [
     Search(
         platform="rakuten_jp",
         keyword="UX-15 シャークスケイルデッキセット",
         name="樂天 UX-15",
+    ),
+    Search(
+        platform="rakuten_jp",
+        keyword="CX-20 カスタマイズセットC",
+        name="樂天 CX-20C",
     ),
     # Search(platform="eslite", keyword="beyblade", name="誠品 Beyblade X 掃描"),
 ]
@@ -127,14 +140,15 @@ SEARCHES: list[Search] = [
 
 @dataclass
 class Target:
-    """「這個商品有貨、且價格 ≤ max_price 時通知我」。
+    """「這個商品可以下單(有貨或可預購)、且價格 ≤ max_price 時通知我」。
 
     只在商品「從不符合變成符合」的那一刻通知一次(alerts.select_alerts),
     持續符合不會重複推播。門檻只看商品標價,不含運費。
+    max_price=None 表示不限價:只要能下單就通知。
     """
 
     product_key: str                  # 例 "UX-15"
-    max_price: int                    # 價格上限(含),單位依平台幣別(樂天為日圓)
+    max_price: Optional[int]          # 價格上限(含),單位依平台幣別(日本平台為日圓);None = 不限
     list_price: Optional[int] = None  # 官方定價,通知裡當參考
     platforms: tuple[str, ...] = ("rakuten_jp",)  # 套用這個目標的平台
 
@@ -142,6 +156,11 @@ class Target:
 TARGETS: list[Target] = [
     # BEYBLADE X UX-15 シャークスケイルデッキセット:官方定價 ¥4,200(2025/8/9 發售)
     Target(product_key="UX-15", max_price=5000, list_price=4200),
+    # CX-20 カスタマイズセットC:メーカー価格 ¥6,600(Bic 售 ¥6,270,2026 年 11 月發售)
+    # Bic Camera:一開放預購 / 有貨就通知(Bic 賣定價以下,不設上限)
+    Target(product_key="CX-20", max_price=None, list_price=6600, platforms=("biccamera",)),
+    # 樂天各店:≤ ¥7,000(≈ 定價 +6%,定價店家會通知,三倍轉賣價不會)
+    Target(product_key="CX-20", max_price=7000, list_price=6600, platforms=("rakuten_jp",)),
 ]
 
 # 品名含這些字就排除:中古品、拆賣單顆(停產品常見把整套拆開賣)。
@@ -188,6 +207,20 @@ class Settings:
     rakuten_referer: str = field(default_factory=lambda: _env("RAKUTEN_REFERER"))
     # 每個關鍵字最多抓幾頁(每頁 30 筆),頁間會間隔 1 秒避免 429。
     rakuten_max_pages: int = field(default_factory=lambda: _env_int("RAKUTEN_MAX_PAGES", 2))
+
+    # --- 執行分工 ---
+    # 只執行這些平台的 monitor(逗號分隔);留空 = 全部。
+    # 家裡電腦:biccamera(Bic 擋雲端 IP);GitHub Actions:rakuten_jp。
+    radar_platforms: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            p.strip() for p in _env("RADAR_PLATFORMS").split(",") if p.strip()
+        )
+    )
+    # 連續失敗幾輪才送一次「監控失敗」警示(避免偶發斷線就吵你)。
+    health_fail_threshold: int = field(default_factory=lambda: _env_int("HEALTH_FAIL_THRESHOLD", 3))
+
+    def platform_enabled(self, platform: str) -> bool:
+        return not self.radar_platforms or platform in self.radar_platforms
 
     @property
     def has_telegram(self) -> bool:

@@ -23,9 +23,12 @@ class DiscoveryMonitor:
 
     def __init__(self, session: Optional[requests.Session] = None):
         self._session = session or requests.Session()
+        # 最近一次 fetch 的錯誤(成功為 None),給健康警示(health.py)判斷用。
+        self.last_error: Optional[str] = None
 
     def fetch_searches(self, searches: list[Search]) -> list[ProductSnapshot]:
         out: list[ProductSnapshot] = []
+        errors: list[str] = []
         for s in searches:
             if s.platform != self.platform:
                 continue
@@ -33,6 +36,8 @@ class DiscoveryMonitor:
                 out.extend(self._search(s))
             except Exception as exc:  # 單一關鍵字失敗不拖垮整輪
                 print(f"[{self.platform}] 搜尋「{s.keyword}」失敗: {exc}")
+                errors.append(str(exc))
+        self.last_error = errors[0] if errors else None
         return out
 
     def _search(self, search: Search) -> list[ProductSnapshot]:  # pragma: no cover - 由子類別實作
